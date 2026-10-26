@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+
+# Compilación
+dist/
+*.tsbuildinfo
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Archivos temporales
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
