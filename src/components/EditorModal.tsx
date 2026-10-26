@@ -1,109 +1,1204 @@
-import { useEffect, useState } from 'react';
-import { X, Trash2, Check, Info } from 'lucide-react';
-import { useCRM } from '../lib/store';
-import { blankDeal, blankContact, blankCompany, blankTask, createId } from '../lib/seed';
-import { Company, Contact, Deal, STAGES, Task, Stage } from '../types';
 
-export type Editing = {kind:'deal';value?:Deal}|{kind:'contact';value?:Contact}|{kind:'company';value?:Company}|{kind:'task';value?:Task};
-const labels={deal:'oportunidad',contact:'contacto',company:'empresa',task:'tarea'};
-export function EditorModal({editing,onClose}:{editing:Editing,onClose:()=>void}) {
-  const crm=useCRM();const {data}=crm;
-  const [form,setForm]=useState<Deal|Contact|Company|Task>(()=>{
-    const now=new Date().toISOString();const id=createId();
-    if(editing.value)return {...editing.value};
-    if(editing.kind==='deal')return {...blankDeal(),id,createdAt:now,updatedAt:now};
-    if(editing.kind==='contact')return {...blankContact(),id,createdAt:now};
-    if(editing.kind==='company')return {...blankCompany(),id,createdAt:now};
-    return {...blankTask(),id,createdAt:now};
-  });
-  const [error,setError]=useState('');
-  useEffect(()=>{const esc=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',esc);return()=>window.removeEventListener('keydown',esc)},[onClose]);
-  const setField=(key:string,value:unknown)=>setForm(current=>({...current,[key]:value}));
-  const save=(event:React.FormEvent)=>{
-    event.preventDefault();setError('');
-    if(editing.kind==='deal') {
-      const item=form as Deal;
-      if(!item.title.trim())return setError('Ingresá el nombre de la oportunidad.');
-      if(!Number.isFinite(item.amount)||item.amount<0)return setError('El importe debe ser un número válido, mayor o igual que cero.');
-      if(item.probability<0||item.probability>100)return setError('La probabilidad debe estar entre 0 y 100.');
-      crm.upsertDeal({...item,title:item.title.trim(),updatedAt:new Date().toISOString()});
-    } else if(editing.kind==='contact') {
-      const item=form as Contact;
-      if(!item.name.trim())return setError('Ingresá el nombre del contacto.');
-      if(item.email&& !/^\S+@\S+\.\S+$/.test(item.email))return setError('Ingresá un correo válido.');
-      if(item.email&&data.contacts.some(c=>c.id!==item.id&&c.email.toLowerCase()===item.email.toLowerCase()))return setError('Ya existe un contacto con ese correo.');
-      crm.upsertContact({...item,name:item.name.trim()});
-    } else if(editing.kind==='company'){
-      const item=form as Company;
-      if(!item.name.trim())return setError('Ingresá el nombre de la empresa.');
-      if(data.companies.some(c=>c.id!==item.id&&c.name.toLowerCase()===item.name.trim().toLowerCase()))return setError('Ya existe una empresa con ese nombre.');
-      crm.upsertCompany({...item,name:item.name.trim()});
-    }else{
-      const item=form as Task;
-      if(!item.title.trim())return setError('Ingresá el título de la tarea.');
-      if(!item.dueDate)return setError('Elegí una fecha de vencimiento.');
-      crm.upsertTask({...item,title:item.title.trim()});
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import type { FormEvent } from 'react';
+
+import {
+  Check,
+  Info,
+  Trash2,
+  X,
+} from 'lucide-react';
+
+import { useCRM } from '../lib/store';
+
+import {
+  blankCompany,
+  blankContact,
+  blankDeal,
+  blankTask,
+  createId,
+} from '../lib/seed';
+
+import type {
+  Company,
+  Contact,
+  Deal,
+  Stage,
+  Task,
+} from '../types';
+
+import { STAGES } from '../types';
+
+import {
+  validateEditor,
+} from '../lib/editorValidation';
+
+import type {
+  EditorEntity,
+} from '../lib/editorValidation';
+
+// ==================================================
+// TIPOS
+// ==================================================
+
+export type Editing =
+  | { kind: 'deal'; value?: Deal }
+  | { kind: 'contact'; value?: Contact }
+  | { kind: 'company'; value?: Company }
+  | { kind: 'task'; value?: Task };
+
+interface EditorModalProps {
+  editing: Editing;
+  onClose: () => void;
+}
+
+const labels = {
+  deal: 'oportunidad',
+  contact: 'contacto',
+  company: 'empresa',
+  task: 'tarea',
+};
+
+// ==================================================
+// FORMULARIO INICIAL
+// ==================================================
+
+function createInitialForm(editing: Editing): EditorEntity {
+  if (editing.value) {
+    return { ...editing.value };
+  }
+
+  const now = new Date().toISOString();
+  const id = createId();
+
+  switch (editing.kind) {
+    case 'deal':
+      return {
+        ...blankDeal(),
+        id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+    case 'contact':
+      return {
+        ...blankContact(),
+        id,
+        createdAt: now,
+      };
+
+    case 'company':
+      return {
+        ...blankCompany(),
+        id,
+        createdAt: now,
+      };
+
+    case 'task':
+      return {
+        ...blankTask(),
+        id,
+        createdAt: now,
+      };
+  }
+}
+
+// ==================================================
+// COMPONENTE
+// ==================================================
+
+export function EditorModal({
+  editing,
+  onClose,
+}: EditorModalProps) {
+  const crm = useCRM();
+  const { data } = crm;
+
+  const modalRef = useRef<HTMLElement>(null);
+  const submittingRef = useRef(false);
+
+  const [form, setForm] = useState<EditorEntity>(
+    () => createInitialForm(editing),
+  );
+
+  const originalRef = useRef(
+    JSON.stringify(form),
+  );
+
+  const [error, setError] = useState('');
+
+  const isDirty =
+    JSON.stringify(form) !== originalRef.current;
+
+  // ==================================================
+  // ACTUALIZAR CAMPOS
+  // ==================================================
+
+  const setField = (
+    key: string,
+    value: unknown,
+  ) => {
+    setError('');
+
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  // ==================================================
+  // CERRAR SIN PERDER DATOS
+  // ==================================================
+
+  const requestClose = useCallback(() => {
+    if (
+      isDirty &&
+      !window.confirm(
+        'Tenés cambios sin guardar. ¿Querés descartarlos y cerrar el formulario?',
+      )
+    ) {
+      return;
     }
+
+    onClose();
+  }, [isDirty, onClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        requestClose();
+        return;
+      }
+
+      // Mantiene el foco dentro del modal.
+      if (event.key === 'Tab') {
+        const modal = modalRef.current;
+
+        if (!modal) return;
+
+        const elements = Array.from(
+          modal.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])',
+          ),
+        ).filter(
+          (element) =>
+            element.getClientRects().length > 0,
+        );
+
+        if (!elements.length) return;
+
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+
+        if (
+          event.shiftKey &&
+          document.activeElement === first
+        ) {
+          event.preventDefault();
+          last.focus();
+        } else if (
+          !event.shiftKey &&
+          document.activeElement === last
+        ) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown,
+      true,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown,
+        true,
+      );
+    };
+  }, [requestClose]);
+
+  // ==================================================
+  // GUARDAR
+  // ==================================================
+
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (submittingRef.current) return;
+
+    setError('');
+
+    const validationError = validateEditor(
+      editing.kind,
+      form,
+      data,
+    );
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    submittingRef.current = true;
+
+    try {
+      switch (editing.kind) {
+        case 'deal': {
+          const item = form as Deal;
+
+          crm.upsertDeal({
+            ...item,
+            title: item.title.trim(),
+            owner: item.owner.trim(),
+            updatedAt: new Date().toISOString(),
+          });
+
+          break;
+        }
+
+        case 'contact': {
+          const item = form as Contact;
+
+          crm.upsertContact({
+            ...item,
+            name: item.name.trim(),
+            email: item.email.trim(),
+            phone: item.phone.trim(),
+            role: item.role.trim(),
+          });
+
+          break;
+        }
+
+        case 'company': {
+          const item = form as Company;
+
+          crm.upsertCompany({
+            ...item,
+            name: item.name.trim(),
+            industry: item.industry.trim(),
+            website: item.website.trim(),
+            location: item.location.trim(),
+          });
+
+          break;
+        }
+
+        case 'task': {
+          const item = form as Task;
+
+          crm.upsertTask({
+            ...item,
+            title: item.title.trim(),
+          });
+
+          break;
+        }
+      }
+
+      onClose();
+    } catch {
+      submittingRef.current = false;
+
+      setError(
+        'No se pudo guardar el registro. Revisá los datos e intentá nuevamente.',
+      );
+    }
+  };
+
+  // ==================================================
+  // ELIMINAR
+  // ==================================================
+
+  const remove = () => {
+    if (!editing.value) return;
+
+    const id = editing.value.id;
+
+    const exists = {
+      deal: data.deals.some(
+        (item) => item.id === id,
+      ),
+      contact: data.contacts.some(
+        (item) => item.id === id,
+      ),
+      company: data.companies.some(
+        (item) => item.id === id,
+      ),
+      task: data.tasks.some(
+        (item) => item.id === id,
+      ),
+    }[editing.kind];
+
+    if (!exists) {
+      setError(
+        'Este registro ya no existe. Cerrá el formulario y actualizá la vista.',
+      );
+      return;
+    }
+
+    if (editing.kind === 'company') {
+      const linkedContacts = data.contacts.filter(
+        (item) => item.companyId === id,
+      ).length;
+
+      const linkedDeals = data.deals.filter(
+        (item) => item.companyId === id,
+      ).length;
+
+      if (linkedContacts || linkedDeals) {
+        setError(
+          `No se puede eliminar esta empresa: tiene ${linkedContacts} contacto(s) y ${linkedDeals} oportunidad(es) asociados. Desvinculalos primero.`,
+        );
+        return;
+      }
+    }
+
+    let consequence =
+      'Esta acción no se puede deshacer.';
+
+    if (editing.kind === 'deal') {
+      const count = data.tasks.filter(
+        (task) => task.dealId === id,
+      ).length;
+
+      if (count > 0) {
+        consequence =
+          `Hay ${count} tarea(s) vinculadas. Se conservarán, pero dejarán de estar asociadas a esta oportunidad.`;
+      }
+    }
+
+    if (editing.kind === 'contact') {
+      const count = data.deals.filter(
+        (deal) => deal.contactId === id,
+      ).length;
+
+      if (count > 0) {
+        consequence =
+          `Hay ${count} oportunidad(es) relacionadas. Se conservarán, pero quedarán sin este contacto.`;
+      }
+    }
+
+    const confirmed = window.confirm(
+      `¿Eliminar esta ${labels[editing.kind]}?\n\n${consequence}`,
+    );
+
+    if (!confirmed) return;
+
+    switch (editing.kind) {
+      case 'deal':
+        crm.removeDeal(id);
+        break;
+
+      case 'contact':
+        crm.removeContact(id);
+        break;
+
+      case 'company':
+        crm.removeCompany(id);
+        break;
+
+      case 'task':
+        crm.removeTask(id);
+        break;
+    }
+
     onClose();
   };
-  const remove=()=>{
-    if(!editing.value)return;
-    if(!window.confirm(`¿Eliminar esta ${labels[editing.kind]}? Esta acción no se puede deshacer.`))return;
-    if(editing.kind==='deal')crm.removeDeal(editing.value.id);
-    if(editing.kind==='contact'){
-      if(data.deals.some(d=>d.contactId===editing.value?.id))return setError('Este contacto está vinculado a oportunidades. Desvinculalo antes de eliminarlo.');
-      crm.removeContact(editing.value.id);
-    }
-    if(editing.kind==='company'){
-      if(data.contacts.some(c=>c.companyId===editing.value?.id)||data.deals.some(d=>d.companyId===editing.value?.id))return setError('Esta empresa tiene contactos u oportunidades vinculados. Desvinculalos primero.');
-      crm.removeCompany(editing.value.id);
-    }
-    if(editing.kind==='task')crm.removeTask(editing.value.id);
-    onClose();
-  };
-  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
-    <section className="editor-modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
-      <header className="modal-head"><div><span className="modal-eyebrow">CENTRO DE TRABAJO</span><h2 id="modal-heading">{editing.value?'Editar':'Nueva'} {labels[editing.kind]}</h2><p>Los cambios se guardan en esta demo automáticamente.</p></div><button className="icon-btn" title="Cerrar" onClick={onClose}><X size={19}/></button></header>
-      <form onSubmit={save} className="modal-form">
-        {editing.kind==='deal'&&<>
-          <div className="form-field full"><label htmlFor="dtitle">Nombre de la oportunidad *</label><input id="dtitle" autoFocus required maxLength={110} value={(form as Deal).title} onChange={e=>setField('title',e.target.value)} placeholder="Ej. Implementación de CRM"/></div>
-          <div className="form-field"><label>Empresa</label><select value={(form as Deal).companyId} onChange={e=>{setField('companyId',e.target.value);setField('contactId','')}}><option value="">Sin empresa</option>{data.companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div className="form-field"><label>Contacto</label><select value={(form as Deal).contactId} onChange={e=>setField('contactId',e.target.value)}><option value="">Sin contacto</option>{data.contacts.filter(c=>!((form as Deal).companyId)||c.companyId===(form as Deal).companyId).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div className="form-field"><label>Importe ({data.settings.currency}) *</label><input type="number" min={0} step="1" required value={(form as Deal).amount} onChange={e=>setField('amount',Number(e.target.value))}/></div>
-          <div className="form-field"><label>Etapa</label><select value={(form as Deal).stage} onChange={e=>{const stage=e.target.value as Stage;setForm(current=>({...current,stage,probability:STAGES.find(s=>s.id===stage)?.probability??15}));}}>{STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
-          <div className="form-field"><label>Probabilidad (%)</label><input type="number" min={0} max={100} required value={(form as Deal).probability} onChange={e=>setField('probability',Number(e.target.value))}/></div>
-          <div className="form-field"><label>Fecha estimada de cierre</label><input type="date" value={(form as Deal).dueDate} onChange={e=>setField('dueDate',e.target.value)}/></div>
-          <div className="form-field full"><label>Responsable</label><input value={(form as Deal).owner} maxLength={90} onChange={e=>setField('owner',e.target.value)}/></div>
-          <div className="form-field full"><label>Notas y próximos pasos</label><textarea rows={4} value={(form as Deal).notes} maxLength={2500} onChange={e=>setField('notes',e.target.value)} placeholder="Contexto, objeciones, próximos pasos…"/></div>
-        </>}
-        {editing.kind==='contact'&&<>
-          <div className="form-field full"><label>Nombre y apellido *</label><input autoFocus required maxLength={100} value={(form as Contact).name} onChange={e=>setField('name',e.target.value)} placeholder="Ej. Ana López"/></div>
-          <div className="form-field"><label>Correo electrónico</label><input type="email" value={(form as Contact).email} onChange={e=>setField('email',e.target.value)} placeholder="ana@empresa.com"/></div>
-          <div className="form-field"><label>Teléfono</label><input type="tel" value={(form as Contact).phone} onChange={e=>setField('phone',e.target.value)} placeholder="+54 341 ..."/></div>
-          <div className="form-field"><label>Empresa</label><select value={(form as Contact).companyId} onChange={e=>setField('companyId',e.target.value)}><option value="">Sin empresa</option>{data.companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-          <div className="form-field"><label>Cargo</label><input value={(form as Contact).role} onChange={e=>setField('role',e.target.value)} placeholder="Ej. Gerente de ventas"/></div>
-          <div className="form-field"><label>Estado</label><select value={(form as Contact).status} onChange={e=>setField('status',e.target.value)}><option value="nuevo">Nuevo</option><option value="contactado">Contactado</option><option value="calificado">Calificado</option></select></div>
-          <div className="form-field"><label>Origen</label><select value={(form as Contact).source} onChange={e=>setField('source',e.target.value)}>{['Manual','Sitio web','Referido','LinkedIn','WhatsApp','Evento','Otro'].map(x=><option key={x}>{x}</option>)}</select></div>
-          <div className="form-field full"><label>Notas</label><textarea rows={4} value={(form as Contact).notes} onChange={e=>setField('notes',e.target.value)}/></div>
-        </>}
-        {editing.kind==='company'&&<>
-          <div className="form-field full"><label>Razón social / nombre *</label><input autoFocus required maxLength={110} value={(form as Company).name} onChange={e=>setField('name',e.target.value)} placeholder="Ej. Estudio Norte"/></div>
-          <div className="form-field"><label>Industria</label><input value={(form as Company).industry} onChange={e=>setField('industry',e.target.value)} placeholder="Tecnología, comercio…"/></div>
-          <div className="form-field"><label>Tamaño del equipo</label><select value={(form as Company).employees} onChange={e=>setField('employees',e.target.value)}>{['1-10','11-50','51-200','201-500','500+'].map(x=><option key={x}>{x}</option>)}</select></div>
-          <div className="form-field"><label>Ubicación</label><input value={(form as Company).location} onChange={e=>setField('location',e.target.value)} placeholder="Rosario, Argentina"/></div>
-          <div className="form-field"><label>Sitio web</label><input value={(form as Company).website} onChange={e=>setField('website',e.target.value)} placeholder="ejemplo.com"/></div>
-        </>}
-        {editing.kind==='task'&&<>
-          <div className="form-field full"><label>Título de la tarea *</label><input autoFocus required maxLength={150} value={(form as Task).title} onChange={e=>setField('title',e.target.value)} placeholder="Ej. Llamar al cliente"/></div>
-          <div className="form-field"><label>Fecha de vencimiento *</label><input type="date" required value={(form as Task).dueDate} onChange={e=>setField('dueDate',e.target.value)}/></div>
-          <div className="form-field"><label>Prioridad</label><select value={(form as Task).priority} onChange={e=>setField('priority',e.target.value)}><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
-          <div className="form-field full"><label>Oportunidad vinculada</label><select value={(form as Task).dealId} onChange={e=>setField('dealId',e.target.value)}><option value="">Sin vincular</option>{data.deals.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}</select></div>
-          <div className="form-field full"><label>Descripción</label><textarea rows={4} value={(form as Task).description} onChange={e=>setField('description',e.target.value)}/></div>
-          <div className="form-field full"><label className="check-label"><input type="checkbox" checked={(form as Task).done} onChange={e=>setField('done',e.target.checked)}/> Marcar como completada</label></div>
-        </>}
-        {error&&<div className="form-error" role="alert"><Info size={15}/>{error}</div>}
-        <footer className="modal-footer">{editing.value&&<button type="button" className="btn btn-danger-subtle" onClick={remove}><Trash2 size={15}/>Eliminar</button>}<span className="modal-spacer"/><button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button><button type="submit" className="btn btn-primary"><Check size={16}/>Guardar {labels[editing.kind]}</button></footer>
-      </form>
-    </section>
-  </div>;
+
+  // ==================================================
+  // INTERFAZ
+  // ==================================================
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        if (
+          event.target === event.currentTarget
+        ) {
+          requestClose();
+        }
+      }}
+    >
+      <section
+        ref={modalRef}
+        className="editor-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-heading"
+      >
+        <header className="modal-head">
+          <div>
+            <span className="modal-eyebrow">
+              CENTRO DE TRABAJO
+            </span>
+
+            <h2 id="modal-heading">
+              {editing.value ? 'Editar' : 'Nueva'}{' '}
+              {labels[editing.kind]}
+            </h2>
+
+            <p>
+              Completá los datos y presioná Guardar.
+              Los cambios se conservarán en este navegador.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="icon-btn"
+            title="Cerrar"
+            aria-label="Cerrar formulario"
+            onClick={requestClose}
+          >
+            <X size={19} />
+          </button>
+        </header>
+
+        <form
+          onSubmit={save}
+          className="modal-form"
+        >
+          {/* ========================================
+              OPORTUNIDAD
+          ======================================== */}
+
+          {editing.kind === 'deal' && (
+            <>
+              <div className="form-field full">
+                <label htmlFor="deal-title">
+                  Nombre de la oportunidad *
+                </label>
+
+                <input
+                  id="deal-title"
+                  autoFocus
+                  required
+                  maxLength={110}
+                  value={(form as Deal).title}
+                  onChange={(event) =>
+                    setField('title', event.target.value)
+                  }
+                  placeholder="Ej. Implementación de CRM"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-company">
+                  Empresa
+                </label>
+
+                <select
+                  id="deal-company"
+                  value={(form as Deal).companyId}
+                  onChange={(event) => {
+                    setError('');
+
+                    setForm((current) => ({
+                      ...current,
+                      companyId: event.target.value,
+                      contactId: '',
+                    }));
+                  }}
+                >
+                  <option value="">
+                    Sin empresa
+                  </option>
+
+                  {data.companies.map((company) => (
+                    <option
+                      key={company.id}
+                      value={company.id}
+                    >
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-contact">
+                  Contacto
+                </label>
+
+                <select
+                  id="deal-contact"
+                  value={(form as Deal).contactId}
+                  onChange={(event) =>
+                    setField(
+                      'contactId',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="">
+                    Sin contacto
+                  </option>
+
+                  {data.contacts
+                    .filter(
+                      (contact) =>
+                        !(form as Deal).companyId ||
+                        contact.companyId ===
+                          (form as Deal).companyId,
+                    )
+                    .map((contact) => (
+                      <option
+                        key={contact.id}
+                        value={contact.id}
+                      >
+                        {contact.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-amount">
+                  Importe ({data.settings.currency}) *
+                </label>
+
+                <input
+                  id="deal-amount"
+                  type="number"
+                  min={0}
+                  step="1"
+                  required
+                  value={(form as Deal).amount}
+                  onChange={(event) =>
+                    setField(
+                      'amount',
+                      Number(event.target.value),
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-stage">
+                  Etapa
+                </label>
+
+                <select
+                  id="deal-stage"
+                  value={(form as Deal).stage}
+                  onChange={(event) => {
+                    const stage = event.target
+                      .value as Stage;
+
+                    setError('');
+
+                    setForm((current) => ({
+                      ...current,
+                      stage,
+                      probability:
+                        STAGES.find(
+                          (item) =>
+                            item.id === stage,
+                        )?.probability ?? 15,
+                    }));
+                  }}
+                >
+                  {STAGES.map((stage) => (
+                    <option
+                      key={stage.id}
+                      value={stage.id}
+                    >
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-probability">
+                  Probabilidad (%)
+                </label>
+
+                <input
+                  id="deal-probability"
+                  type="number"
+                  min={0}
+                  max={100}
+                  required
+                  value={(form as Deal).probability}
+                  onChange={(event) =>
+                    setField(
+                      'probability',
+                      Number(event.target.value),
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="deal-date">
+                  Fecha estimada de cierre
+                </label>
+
+                <input
+                  id="deal-date"
+                  type="date"
+                  value={(form as Deal).dueDate}
+                  onChange={(event) =>
+                    setField(
+                      'dueDate',
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field full">
+                <label htmlFor="deal-owner">
+                  Responsable *
+                </label>
+
+                <input
+                  id="deal-owner"
+                  required
+                  maxLength={90}
+                  value={(form as Deal).owner}
+                  onChange={(event) =>
+                    setField(
+                      'owner',
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field full">
+                <label htmlFor="deal-notes">
+                  Notas y próximos pasos
+                </label>
+
+                <textarea
+                  id="deal-notes"
+                  rows={4}
+                  maxLength={2500}
+                  value={(form as Deal).notes}
+                  onChange={(event) =>
+                    setField(
+                      'notes',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Contexto, objeciones, próximos pasos…"
+                />
+              </div>
+            </>
+          )}
+
+          {/* ========================================
+              CONTACTO
+          ======================================== */}
+
+          {editing.kind === 'contact' && (
+            <>
+              <div className="form-field full">
+                <label htmlFor="contact-name">
+                  Nombre y apellido *
+                </label>
+
+                <input
+                  id="contact-name"
+                  autoFocus
+                  required
+                  maxLength={100}
+                  value={(form as Contact).name}
+                  onChange={(event) =>
+                    setField(
+                      'name',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Ej. Ana López"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-email">
+                  Correo electrónico
+                </label>
+
+                <input
+                  id="contact-email"
+                  type="email"
+                  value={(form as Contact).email}
+                  onChange={(event) =>
+                    setField(
+                      'email',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="ana@empresa.com"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-phone">
+                  Teléfono
+                </label>
+
+                <input
+                  id="contact-phone"
+                  type="tel"
+                  value={(form as Contact).phone}
+                  onChange={(event) =>
+                    setField(
+                      'phone',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="+54 341 ..."
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-company">
+                  Empresa
+                </label>
+
+                <select
+                  id="contact-company"
+                  value={(form as Contact).companyId}
+                  onChange={(event) =>
+                    setField(
+                      'companyId',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="">
+                    Sin empresa
+                  </option>
+
+                  {data.companies.map((company) => (
+                    <option
+                      key={company.id}
+                      value={company.id}
+                    >
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-role">
+                  Cargo
+                </label>
+
+                <input
+                  id="contact-role"
+                  value={(form as Contact).role}
+                  onChange={(event) =>
+                    setField(
+                      'role',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Ej. Gerente de ventas"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-status">
+                  Estado
+                </label>
+
+                <select
+                  id="contact-status"
+                  value={(form as Contact).status}
+                  onChange={(event) =>
+                    setField(
+                      'status',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="nuevo">
+                    Nuevo
+                  </option>
+
+                  <option value="contactado">
+                    Contactado
+                  </option>
+
+                  <option value="calificado">
+                    Calificado
+                  </option>
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="contact-source">
+                  Origen
+                </label>
+
+                <select
+                  id="contact-source"
+                  value={(form as Contact).source}
+                  onChange={(event) =>
+                    setField(
+                      'source',
+                      event.target.value,
+                    )
+                  }
+                >
+                  {[
+                    'Manual',
+                    'Sitio web',
+                    'Referido',
+                    'LinkedIn',
+                    'WhatsApp',
+                    'Evento',
+                    'Otro',
+                  ].map((source) => (
+                    <option key={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field full">
+                <label htmlFor="contact-notes">
+                  Notas
+                </label>
+
+                <textarea
+                  id="contact-notes"
+                  rows={4}
+                  value={(form as Contact).notes}
+                  onChange={(event) =>
+                    setField(
+                      'notes',
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+            </>
+          )}
+
+          {/* ========================================
+              EMPRESA
+          ======================================== */}
+
+          {editing.kind === 'company' && (
+            <>
+              <div className="form-field full">
+                <label htmlFor="company-name">
+                  Razón social / nombre *
+                </label>
+
+                <input
+                  id="company-name"
+                  autoFocus
+                  required
+                  maxLength={110}
+                  value={(form as Company).name}
+                  onChange={(event) =>
+                    setField(
+                      'name',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Ej. Estudio Norte"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="company-industry">
+                  Industria
+                </label>
+
+                <input
+                  id="company-industry"
+                  value={(form as Company).industry}
+                  onChange={(event) =>
+                    setField(
+                      'industry',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Tecnología, comercio…"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="company-size">
+                  Tamaño del equipo
+                </label>
+
+                <select
+                  id="company-size"
+                  value={(form as Company).employees}
+                  onChange={(event) =>
+                    setField(
+                      'employees',
+                      event.target.value,
+                    )
+                  }
+                >
+                  {[
+                    '1-10',
+                    '11-50',
+                    '51-200',
+                    '201-500',
+                    '500+',
+                  ].map((size) => (
+                    <option key={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="company-location">
+                  Ubicación
+                </label>
+
+                <input
+                  id="company-location"
+                  value={(form as Company).location}
+                  onChange={(event) =>
+                    setField(
+                      'location',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Rosario, Argentina"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="company-website">
+                  Sitio web
+                </label>
+
+                <input
+                  id="company-website"
+                  value={(form as Company).website}
+                  onChange={(event) =>
+                    setField(
+                      'website',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="ejemplo.com"
+                />
+              </div>
+            </>
+          )}
+
+          {/* ========================================
+              TAREA
+          ======================================== */}
+
+          {editing.kind === 'task' && (
+            <>
+              <div className="form-field full">
+                <label htmlFor="task-title">
+                  Título de la tarea *
+                </label>
+
+                <input
+                  id="task-title"
+                  autoFocus
+                  required
+                  maxLength={150}
+                  value={(form as Task).title}
+                  onChange={(event) =>
+                    setField(
+                      'title',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Ej. Llamar al cliente"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="task-date">
+                  Fecha de vencimiento *
+                </label>
+
+                <input
+                  id="task-date"
+                  type="date"
+                  required
+                  value={(form as Task).dueDate}
+                  onChange={(event) =>
+                    setField(
+                      'dueDate',
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="task-priority">
+                  Prioridad
+                </label>
+
+                <select
+                  id="task-priority"
+                  value={(form as Task).priority}
+                  onChange={(event) =>
+                    setField(
+                      'priority',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="alta">
+                    Alta
+                  </option>
+
+                  <option value="media">
+                    Media
+                  </option>
+
+                  <option value="baja">
+                    Baja
+                  </option>
+                </select>
+              </div>
+
+              <div className="form-field full">
+                <label htmlFor="task-deal">
+                  Oportunidad vinculada
+                </label>
+
+                <select
+                  id="task-deal"
+                  value={(form as Task).dealId}
+                  onChange={(event) =>
+                    setField(
+                      'dealId',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="">
+                    Sin vincular
+                  </option>
+
+                  {data.deals.map((deal) => (
+                    <option
+                      key={deal.id}
+                      value={deal.id}
+                    >
+                      {deal.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field full">
+                <label htmlFor="task-description">
+                  Descripción
+                </label>
+
+                <textarea
+                  id="task-description"
+                  rows={4}
+                  value={(form as Task).description}
+                  onChange={(event) =>
+                    setField(
+                      'description',
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="form-field full">
+                <label className="check-label">
+                  <input
+                    type="checkbox"
+                    checked={(form as Task).done}
+                    onChange={(event) =>
+                      setField(
+                        'done',
+                        event.target.checked,
+                      )
+                    }
+                  />
+
+                  Marcar como completada
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* ========================================
+              ERRORES Y ACCIONES
+          ======================================== */}
+
+          {error && (
+            <div
+              className="form-error"
+              role="alert"
+            >
+              <Info size={15} />
+              {error}
+            </div>
+          )}
+
+          <footer className="modal-footer">
+            {editing.value && (
+              <button
+                type="button"
+                className="btn btn-danger-subtle"
+                onClick={remove}
+              >
+                <Trash2 size={15} />
+                Eliminar
+              </button>
+            )}
+
+            <span className="modal-spacer" />
+
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={requestClose}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+            >
+              <Check size={16} />
+              Guardar {labels[editing.kind]}
+            </button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  );
 }
