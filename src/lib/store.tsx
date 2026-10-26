@@ -18,11 +18,14 @@ import {
   ActivityType,
 } from '../types';
 
+import { createId, initialData, seedDemo } from './seed';
+
 import {
-  createId,
-  initialData,
-  seedDemo,
-} from './seed';
+  Collection,
+  deleteRecord,
+} from './integrity';
+
+import { assertData } from './utils';
 
 type Entity = Deal | Company | Contact | Task;
 
@@ -31,10 +34,7 @@ interface Store {
 
   upsertDeal: (value: Deal) => void;
   removeDeal: (id: string) => void;
-  changeStage: (
-    id: string,
-    stage: Deal['stage'],
-  ) => void;
+  changeStage: (id: string, stage: Deal['stage']) => void;
 
   upsertContact: (value: Contact) => void;
   removeContact: (id: string) => void;
@@ -79,6 +79,7 @@ export function CRMProvider({
   const [data, setData] = useState<CRMData>(initialData);
   const [notification, setNotification] = useState('');
 
+  // Guardado de la demo en el navegador.
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -86,49 +87,52 @@ export function CRMProvider({
         JSON.stringify(data),
       );
     } catch {
-      /* storage blocked; UI still works in session */
+      // Si el navegador bloquea el almacenamiento,
+      // el CRM sigue funcionando durante la sesión.
     }
   }, [data]);
 
+  // Ocultar notificaciones después de 3,5 segundos.
   useEffect(() => {
     if (!notification) return;
 
-    const timer = window.setTimeout(
-      () => setNotification(''),
-      3500,
-    );
+    const timer = window.setTimeout(() => {
+      setNotification('');
+    }, 3500);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [notification]);
 
-  const notify = useCallback(
-    (message: string) => setNotification(message),
-    [],
-  );
+  const notify = useCallback((message: string) => {
+    setNotification(message);
+  }, []);
 
+  // Crear o actualizar registros.
   const update = useCallback(
     (
-      collection: 'deals' | 'contacts' | 'companies' | 'tasks',
+      collection: Collection,
       entry: Entity,
       description: string,
       type: ActivityType,
     ) => {
-      setData((prev) => {
-        const old = prev[collection] as Entity[];
+      setData((previous) => {
+        const current = previous[collection] as Entity[];
 
-        const exists = old.some(
+        const exists = current.some(
           (item) => item.id === entry.id,
         );
 
-        const next = exists
-          ? old.map((item) =>
+        const updated = exists
+          ? current.map((item) =>
               item.id === entry.id ? entry : item,
             )
-          : [entry, ...old];
+          : [entry, ...current];
 
         return {
-          ...prev,
-          [collection]: next,
+          ...previous,
+          [collection]: updated,
           activities: [
             historyItem(
               type,
@@ -137,140 +141,156 @@ export function CRMProvider({
                 : 'Nuevo registro',
               description,
             ),
-            ...prev.activities,
+            ...previous.activities,
           ].slice(0, 150),
         };
       });
 
-      notify('Cambios guardados correctamente');
+      notify('Cambios guardados correctamente.');
     },
     [notify],
   );
 
   const upsertDeal = useCallback(
-    (value: Deal) =>
-      update('deals', value, value.title, 'deal'),
+    (value: Deal) => {
+      update('deals', value, value.title, 'deal');
+    },
     [update],
   );
 
   const upsertContact = useCallback(
-    (value: Contact) =>
-      update('contacts', value, value.name, 'contact'),
+    (value: Contact) => {
+      update('contacts', value, value.name, 'contact');
+    },
     [update],
   );
 
   const upsertCompany = useCallback(
-    (value: Company) =>
-      update('companies', value, value.name, 'company'),
+    (value: Company) => {
+      update('companies', value, value.name, 'company');
+    },
     [update],
   );
 
   const upsertTask = useCallback(
-    (value: Task) =>
-      update('tasks', value, value.title, 'task'),
+    (value: Task) => {
+      update('tasks', value, value.title, 'task');
+    },
     [update],
   );
 
-  const remove = useCallback(
+  // Eliminar registros respetando sus relaciones.
+  const removeEntity = useCallback(
     (
-      collection: 'deals' | 'contacts' | 'companies' | 'tasks',
+      collection: Collection,
       id: string,
       type: ActivityType,
     ) => {
-      setData((prev) => ({
-        ...prev,
-        [collection]: (
-          prev[collection] as Entity[]
-        ).filter((item) => item.id !== id),
-        activities: [
-          historyItem(type, 'Registro eliminado', id),
-          ...prev.activities,
-        ].slice(0, 150),
-      }));
+      const result = deleteRecord(
+        data,
+        collection,
+        id,
+      );
 
-      notify('Registro eliminado');
+      if (result.status !== 'deleted') {
+        notify(result.message);
+        return;
+      }
+
+      setData((previous) => {
+        const currentResult = deleteRecord(
+          previous,
+          collection,
+          id,
+        );
+
+        if (currentResult.status !== 'deleted') {
+          return previous;
+        }
+
+        return {
+          ...currentResult.data,
+          activities: [
+            historyItem(
+              type,
+              'Registro eliminado',
+              currentResult.title,
+            ),
+            ...currentResult.data.activities,
+          ].slice(0, 150),
+        };
+      });
+
+      notify(result.message);
     },
-    [notify],
+    [data, notify],
   );
 
   const removeDeal = useCallback(
-    (id: string) =>
-      remove('deals', id, 'deal'),
-    [remove],
+    (id: string) => {
+      removeEntity('deals', id, 'deal');
+    },
+    [removeEntity],
   );
 
   const removeContact = useCallback(
-    (id: string) =>
-      remove('contacts', id, 'contact'),
-    [remove],
+    (id: string) => {
+      removeEntity('contacts', id, 'contact');
+    },
+    [removeEntity],
   );
 
   const removeCompany = useCallback(
     (id: string) => {
-      setData((prev) => {
-        if (
-          prev.deals.some(
-            (item) => item.companyId === id,
-          ) ||
-          prev.contacts.some(
-            (item) => item.companyId === id,
-          )
-        ) {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          companies: prev.companies.filter(
-            (item) => item.id !== id,
-          ),
-          activities: [
-            historyItem(
-              'company',
-              'Empresa eliminada',
-              id,
-            ),
-            ...prev.activities,
-          ],
-        };
-      });
-
-      notify(
-        'Si la empresa tiene relaciones, primero desvinculá sus registros.',
-      );
+      removeEntity('companies', id, 'company');
     },
-    [notify],
+    [removeEntity],
   );
 
   const removeTask = useCallback(
-    (id: string) =>
-      remove('tasks', id, 'task'),
-    [remove],
+    (id: string) => {
+      removeEntity('tasks', id, 'task');
+    },
+    [removeEntity],
   );
 
+  // Cambiar la etapa de una oportunidad.
   const changeStage = useCallback(
     (id: string, stage: Deal['stage']) => {
-      setData((prev) => {
-        const old = prev.deals.find(
+      const current = data.deals.find(
+        (deal) => deal.id === id,
+      );
+
+      if (!current) {
+        notify('La oportunidad ya no existe.');
+        return;
+      }
+
+      if (current.stage === stage) {
+        return;
+      }
+
+      const probability = {
+        prospeccion: 15,
+        calificacion: 35,
+        propuesta: 60,
+        negociacion: 80,
+        ganado: 100,
+        perdido: 0,
+      }[stage];
+
+      setData((previous) => {
+        const old = previous.deals.find(
           (deal) => deal.id === id,
         );
 
         if (!old || old.stage === stage) {
-          return prev;
+          return previous;
         }
 
-        const probability = {
-          prospeccion: 15,
-          calificacion: 35,
-          propuesta: 60,
-          negociacion: 80,
-          ganado: 100,
-          perdido: 0,
-        }[stage];
-
         return {
-          ...prev,
-          deals: prev.deals.map((deal) =>
+          ...previous,
+          deals: previous.deals.map((deal) =>
             deal.id === id
               ? {
                   ...deal,
@@ -290,84 +310,116 @@ export function CRMProvider({
                   : 'Etapa actualizada',
               old.title,
             ),
-            ...prev.activities,
+            ...previous.activities,
           ].slice(0, 150),
         };
       });
 
-      notify('Oportunidad actualizada');
+      notify('Etapa de la oportunidad actualizada.');
     },
-    [notify],
+    [data.deals, notify],
   );
 
+  // Completar o reabrir una tarea.
   const toggleTask = useCallback(
     (id: string) => {
-      setData((prev) => ({
-        ...prev,
-        tasks: prev.tasks.map((task) =>
-          task.id === id
+      const task = data.tasks.find(
+        (item) => item.id === id,
+      );
+
+      if (!task) {
+        notify('La tarea ya no existe.');
+        return;
+      }
+
+      setData((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === id
             ? {
-                ...task,
-                done: !task.done,
+                ...item,
+                done: !item.done,
               }
-            : task,
+            : item,
         ),
         activities: [
           historyItem(
             'task',
-            'Estado de tarea actualizado',
-            prev.tasks.find(
-              (task) => task.id === id,
-            )?.title ?? 'Tarea',
+            task.done
+              ? 'Tarea reabierta'
+              : 'Tarea completada',
+            task.title,
           ),
-          ...prev.activities,
+          ...previous.activities,
         ].slice(0, 150),
       }));
     },
-    [],
+    [data.tasks, notify],
   );
 
+  // Preferencias generales.
   const updateSettings = useCallback(
     (value: Settings) => {
-      setData((prev) => ({
-        ...prev,
+      setData((previous) => ({
+        ...previous,
         settings: value,
       }));
 
-      notify('Preferencias actualizadas');
+      notify('Preferencias actualizadas.');
     },
     [notify],
   );
 
+  // Restaurar un respaldo validado.
   const restore = useCallback(
     (value: CRMData) => {
-      setData(value);
-      notify('Respaldo restaurado correctamente');
+      try {
+        const validated = assertData(value);
+
+        setData(validated);
+
+        notify(
+          'Respaldo restaurado correctamente.',
+        );
+      } catch {
+        notify(
+          'No se restauró el respaldo: contiene datos inválidos.',
+        );
+      }
     },
     [notify],
   );
 
+  // Restablecer los datos ficticios iniciales.
   const reset = useCallback(() => {
     setData(seedDemo());
-    notify('Datos de demostración restaurados');
+
+    notify('Datos de demostración restaurados.');
   }, [notify]);
 
   const store = useMemo(
     () => ({
       data,
+
       upsertDeal,
       removeDeal,
       changeStage,
+
       upsertContact,
       removeContact,
+
       upsertCompany,
       removeCompany,
+
       upsertTask,
       removeTask,
       toggleTask,
+
       updateSettings,
+
       restore,
       reset,
+
       notification,
       notify,
     }),
