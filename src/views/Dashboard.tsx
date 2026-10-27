@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   BadgeCheck,
+  CalendarClock,
   CalendarDays,
   CircleAlert,
   CircleCheck,
@@ -17,16 +18,23 @@ import {
 import { useCRM } from '../lib/store';
 
 import {
+  dealNeedsAttention,
+  getDealFollowUp,
+  getPriorityItems,
+  nextPendingTask,
+} from '../lib/commercial';
+
+import {
+  fmtDateTime,
   money,
   openDeals,
   overdue,
   pipelineValue,
-  todayDue,
   weightedValue,
-  fmtDateTime,
 } from '../lib/utils';
 
-import { Deal, Page, STAGES } from '../types';
+import type { Deal, Page } from '../types';
+import { STAGES } from '../types';
 
 import {
   DealCard,
@@ -42,16 +50,24 @@ import {
   RevenueLegend,
 } from '../components/Charts';
 
+import './commercial.css';
+
+interface DashboardProps {
+  navigate: (page: Page) => void;
+  newDeal: () => void;
+  editDeal: (deal: Deal) => void;
+}
+
 export function Dashboard({
   navigate,
   newDeal,
   editDeal,
-}: {
-  navigate: (page: Page) => void;
-  newDeal: () => void;
-  editDeal: (deal: Deal) => void;
-}) {
+}: DashboardProps) {
   const { data, changeStage } = useCRM();
+
+  // ============================================
+  // INDICADORES GENERALES
+  // ============================================
 
   const active = openDeals(data.deals);
 
@@ -59,63 +75,110 @@ export function Dashboard({
     (deal) => deal.stage === 'ganado',
   );
 
-  const closed = data.deals.filter((deal) =>
-    ['ganado', 'perdido'].includes(deal.stage),
+  const closed = data.deals.filter(
+    (deal) =>
+      deal.stage === 'ganado' ||
+      deal.stage === 'perdido',
   );
 
   const winRate = closed.length
-    ? Math.round((won.length / closed.length) * 100)
+    ? Math.round(
+        (won.length / closed.length) * 100,
+      )
     : 0;
 
-  const pending = data.tasks.filter((task) => !task.done);
+  const pending = data.tasks
+    .filter((task) => !task.done)
+    .sort((a, b) =>
+      a.dueDate.localeCompare(b.dueDate),
+    );
 
-  const critical = pending.filter(
-    (task) =>
-      overdue(task.dueDate) || todayDue(task.dueDate),
+  // ============================================
+  // PRIORIDADES COMERCIALES
+  // ============================================
+
+  const priorities = getPriorityItems(data);
+
+  const overdueItems = priorities.filter(
+    (item) => item.tone === 'overdue',
   );
 
-  const insights = [
-    critical.length
-      ? {
-          title: `${critical.length} seguimiento${
-            critical.length !== 1 ? 's' : ''
-          } para revisar`,
-          detail:
-            'Hay tareas pendientes para hoy o vencidas. Priorizá esos contactos.',
-          tone: 'orange',
-        }
-      : {
-          title: 'Seguimientos al día',
-          detail:
-            'No tenés tareas vencidas ni pendientes para hoy.',
-          tone: 'green',
-        },
+  const todayItems = priorities.filter(
+    (item) => item.tone === 'today',
+  );
 
-    active.filter((deal) => overdue(deal.dueDate)).length
-      ? {
-          title: 'Cierres que necesitan atención',
-          detail: `${
-            active.filter((deal) => overdue(deal.dueDate))
-              .length
-          } oportunidades superaron su fecha estimada.`,
-          tone: 'blue',
-        }
-      : {
-          title: 'Pipeline en movimiento',
-          detail:
-            'Las oportunidades abiertas tienen fechas de cierre vigentes.',
-          tone: 'blue',
-        },
+  const dealsWithoutFollowUp = active.filter(
+    (deal) =>
+      !nextPendingTask(deal.id, data.tasks),
+  );
+
+  const urgentDeals = active.filter((deal) =>
+    dealNeedsAttention(
+      deal,
+      data.tasks,
+    ),
+  );
+
+  // ============================================
+  // RECOMENDACIONES DEL RADAR
+  // ============================================
+
+  const insights = [
+    {
+      title: priorities.length
+        ? `${priorities.length} asunto${
+            priorities.length !== 1 ? 's' : ''
+          } para revisar`
+        : 'Todo al día',
+      detail: priorities.length
+        ? 'Hay tareas pendientes o fechas de cierre que requieren atención.'
+        : 'No hay tareas urgentes ni cierres estimados vencidos.',
+      tone: priorities.length
+        ? 'orange'
+        : 'green',
+      page: 'tasks' as Page,
+    },
+    {
+      title: dealsWithoutFollowUp.length
+        ? `${dealsWithoutFollowUp.length} oportunidad${
+            dealsWithoutFollowUp.length !== 1 ? 'es' : ''
+          } sin seguimiento`
+        : 'Seguimientos organizados',
+      detail: dealsWithoutFollowUp.length
+        ? 'Estas oportunidades no tienen una tarea pendiente asociada.'
+        : 'Todas las oportunidades abiertas tienen al menos una tarea pendiente.',
+      tone: dealsWithoutFollowUp.length
+        ? 'orange'
+        : 'green',
+      page: 'deals' as Page,
+    },
+    {
+      title: urgentDeals.length
+        ? `${urgentDeals.length} oportunidad${
+            urgentDeals.length !== 1 ? 'es' : ''
+          } con atención pendiente`
+        : 'Pipeline actualizado',
+      detail: urgentDeals.length
+        ? 'Revisá los cierres estimados y próximos seguimientos.'
+        : 'No hay oportunidades abiertas con fechas vencidas o tareas urgentes.',
+      tone: 'blue',
+      page: 'deals' as Page,
+    },
   ];
+
+  // ============================================
+  // INTERFAZ
+  // ============================================
 
   return (
     <>
       <PageHeading
         eyebrow="WORKSPACE / RESUMEN"
         title="Tu operación, en una sola vista."
-        subtitle="Una lectura clara de tus oportunidades, clientes y próximos pasos."
+        subtitle="Prioridades claras, oportunidades organizadas y decisiones basadas en tus datos."
         action={
           <button
+            type="button"
             className="btn btn-primary"
             onClick={newDeal}
           >
@@ -127,22 +190,153 @@ export function Dashboard({
           <span className="date-chip">
             <CalendarDays size={15} />
 
-            {new Date().toLocaleDateString('es-AR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
+            {new Date().toLocaleDateString(
+              'es-AR',
+              {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              },
+            )}
           </span>
         }
       />
 
       <div className="dashboard-layout">
         <div className="dashboard-main">
+          {/* ====================================
+              PRIORIDADES DEL DÍA
+          ==================================== */}
+
+          <section
+            className="panel workday-panel"
+            aria-label="Prioridades comerciales"
+          >
+            <div className="workday-head">
+              <SectionTitle
+                icon={<CalendarClock size={18} />}
+                title="Lo que requiere tu atención"
+                description="Empezá por lo importante antes de revisar los números"
+              />
+
+              <span className="workday-counter">
+                {priorities.length}
+                {' '}
+                pendiente
+                {priorities.length !== 1
+                  ? 's'
+                  : ''}
+              </span>
+            </div>
+
+            {priorities.length ? (
+              <div className="workday-list">
+                {priorities
+                  .slice(0, 3)
+                  .map((item) => (
+                    <button
+                      key={`${item.kind}-${item.id}`}
+                      type="button"
+                      className={`workday-item workday-${item.tone}`}
+                      onClick={() => {
+                        if (
+                          item.kind === 'task'
+                        ) {
+                          navigate('tasks');
+                          return;
+                        }
+
+                        const deal =
+                          data.deals.find(
+                            (entry) =>
+                              entry.id === item.id,
+                          );
+
+                        if (deal) {
+                          editDeal(deal);
+                        }
+                      }}
+                    >
+                      <span className="workday-item-icon">
+                        {item.tone ===
+                        'overdue' ? (
+                          <CircleAlert
+                            size={17}
+                          />
+                        ) : (
+                          <Clock3
+                            size={17}
+                          />
+                        )}
+                      </span>
+
+                      <span className="workday-item-content">
+                        <strong>
+                          {item.title}
+                        </strong>
+
+                        <small>
+                          {item.detail}
+                        </small>
+                      </span>
+
+                      <ArrowUpRight size={16} />
+                    </button>
+                  ))}
+              </div>
+            ) : (
+              <div className="workday-empty">
+                <CircleCheck size={20} />
+
+                <div>
+                  <strong>
+                    No hay urgencias registradas.
+                  </strong>
+
+                  <p>
+                    Las tareas de hoy y los
+                    cierres vencidos aparecerán
+                    aquí automáticamente.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="workday-footer">
+              <span>
+                {overdueItems.length}
+                {' '}
+                vencidos
+                {' · '}
+                {todayItems.length}
+                {' '}
+                para hoy
+              </span>
+
+              <button
+                type="button"
+                className="text-action"
+                onClick={() =>
+                  navigate('tasks')
+                }
+              >
+                Abrir tareas
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </section>
+
+          {/* ====================================
+              MÉTRICAS PRINCIPALES
+          ==================================== */}
+
           <div className="kpi-grid">
             <StatTile
               label="Oportunidades activas"
-              value={String(active.length).padStart(2, '0')}
-              meta={`${data.deals.length} oportunidades totales`}
+              value={String(
+                active.length,
+              ).padStart(2, '0')}
+              meta={`${data.deals.length} oportunidades registradas`}
               icon={<GitBranch size={16} />}
             />
 
@@ -153,40 +347,47 @@ export function Dashboard({
                 data.settings.currency,
                 true,
               )}
-              meta="Oportunidades abiertas"
+              meta="Importe total de oportunidades abiertas"
               icon={<TrendingUp size={16} />}
             />
 
             <StatTile
               label="Tasa de cierre"
               value={`${winRate}%`}
-              meta={`${won.length} ganadas / ${closed.length} cerradas`}
+              meta={`${won.length} ganadas de ${closed.length} cerradas`}
               icon={<BadgeCheck size={16} />}
             />
 
             <StatTile
-              label="Ingresos estimados"
+              label="Proyección ponderada"
               value={money(
                 weightedValue(data.deals),
                 data.settings.currency,
                 true,
               )}
-              meta="Ponderados por probabilidad"
+              meta="Importe abierto multiplicado por probabilidad"
               icon={<Zap size={16} />}
             />
           </div>
+
+          {/* ====================================
+              PIPELINE RESUMIDO
+          ==================================== */}
 
           <div className="panel board-panel">
             <div className="panel-heading">
               <SectionTitle
                 icon={<GitBranch size={18} />}
                 title="Pipeline de ventas"
-                description="Las oportunidades, organizadas por etapa"
+                description="Oportunidades abiertas y su próximo seguimiento"
               />
 
               <button
+                type="button"
                 className="text-action"
-                onClick={() => navigate('deals')}
+                onClick={() =>
+                  navigate('deals')
+                }
               >
                 Ver pipeline completo
                 <ArrowRight size={15} />
@@ -194,89 +395,146 @@ export function Dashboard({
             </div>
 
             <div className="board-scroll dashboard-board">
-              {STAGES.slice(0, 4).map((stage) => {
-                const list = active.filter(
-                  (deal) => deal.stage === stage.id,
-                );
+              {STAGES.slice(0, 4).map(
+                (stage) => {
+                  const list = active.filter(
+                    (deal) =>
+                      deal.stage === stage.id,
+                  );
 
-                return (
-                  <div
-                    key={stage.id}
-                    className="board-column"
-                    onDragOver={(event) =>
-                      event.preventDefault()
-                    }
-                    onDrop={(event) => {
-                      event.preventDefault();
+                  const stageAmount =
+                    list.reduce(
+                      (total, deal) =>
+                        total + deal.amount,
+                      0,
+                    );
 
-                      const id =
-                        event.dataTransfer.getData(
-                          'text/plain',
-                        );
-
-                      if (
-                        data.deals.some(
-                          (deal) => deal.id === id,
-                        )
-                      ) {
-                        changeStage(id, stage.id);
+                  return (
+                    <div
+                      key={stage.id}
+                      className="board-column"
+                      onDragOver={(event) =>
+                        event.preventDefault()
                       }
-                    }}
-                  >
-                    <div className="column-heading">
-                      <div>
-                        <span
-                          className="stage-dot"
-                          style={{
-                            background: stage.color,
-                          }}
-                        />
+                      onDrop={(event) => {
+                        event.preventDefault();
 
-                        {stage.label}
+                        const id =
+                          event.dataTransfer.getData(
+                            'text/plain',
+                          );
 
-                        <span className="column-count">
-                          {list.length}
-                        </span>
+                        if (
+                          data.deals.some(
+                            (deal) =>
+                              deal.id === id,
+                          )
+                        ) {
+                          changeStage(
+                            id,
+                            stage.id,
+                          );
+                        }
+                      }}
+                    >
+                      <div className="column-heading">
+                        <div>
+                          <span
+                            className="stage-dot"
+                            style={{
+                              background:
+                                stage.color,
+                            }}
+                          />
+
+                          {stage.label}
+
+                          <span className="column-count">
+                            {list.length}
+                          </span>
+                        </div>
+
+                        <strong>
+                          {money(
+                            stageAmount,
+                            data.settings.currency,
+                            true,
+                          )}
+                        </strong>
                       </div>
 
-                      <strong>
-                        {money(
-                          list.reduce(
-                            (total, deal) =>
-                              total + deal.amount,
-                            0,
-                          ),
-                          data.settings.currency,
-                          true,
-                        )}
-                      </strong>
+                      {list.length ? (
+                        list
+                          .slice(0, 3)
+                          .map((deal) => {
+                            const followUp =
+                              getDealFollowUp(
+                                deal,
+                                data.tasks,
+                              );
+
+                            return (
+                              <div
+                                key={deal.id}
+                                className="deal-card-stack"
+                              >
+                                <DealCard
+                                  deal={deal}
+                                  onClick={() =>
+                                    editDeal(
+                                      deal,
+                                    )
+                                  }
+                                />
+
+                                <div
+                                  className={`deal-follow-up follow-up-${followUp.tone}`}
+                                >
+                                  <CalendarClock
+                                    size={14}
+                                  />
+
+                                  <div>
+                                    <strong>
+                                      {followUp.label}
+                                    </strong>
+
+                                    <small>
+                                      {followUp.detail}
+                                    </small>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                      ) : (
+                        <div className="board-empty">
+                          Arrastrá una oportunidad aquí
+                        </div>
+                      )}
                     </div>
+                  );
+                },
+              )}
+            </div>
 
-                    {list.length ? (
-                      list.slice(0, 3).map((deal) => (
-                        <DealCard
-                          key={deal.id}
-                          deal={deal}
-                          onClick={() => editDeal(deal)}
-                        />
-                      ))
-                    ) : (
-                      <div className="board-empty">
-                        Arrastrá una oportunidad aquí
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="commercial-board-note">
+              Se muestran hasta tres oportunidades por
+              etapa. Abrí el pipeline completo para
+              gestionar todas las negociaciones.
             </div>
           </div>
+
+          {/* ====================================
+              PROYECCIÓN
+          ==================================== */}
 
           <div className="panel forecast-panel">
             <div className="panel-heading">
               <SectionTitle
                 icon={<TrendingUp size={18} />}
                 title="Proyección de ingresos"
-                description="Estimación según fechas y probabilidades de cierre"
+                description="Estimación orientativa basada en fechas, importes y probabilidades"
               />
 
               <RevenueLegend />
@@ -285,28 +543,36 @@ export function Dashboard({
             <ForecastChart height={224} />
 
             <div className="panel-footnote">
-              Los importes se calculan con los datos cargados
-              en esta demo. No representan ingresos reales.
+              La proyección no representa dinero
+              cobrado ni garantiza futuros ingresos.
+              Se calcula con los datos de esta demo.
             </div>
           </div>
         </div>
 
+        {/* ======================================
+            COLUMNA DERECHA
+        ====================================== */}
+
         <aside className="dashboard-side">
+          {/* RADAR COMERCIAL */}
+
           <div className="panel intelligence-panel">
             <SectionTitle
               icon={<Sparkles size={18} />}
               title="Radar comercial"
-              description="Señales para decidir qué hacer ahora"
+              description="Alertas basadas en tus registros"
             />
 
             <div className="insight-stack">
-              {insights.map((insight, index) => (
+              {insights.map((insight) => (
                 <button
-                  key={index}
+                  key={insight.title}
+                  type="button"
                   className="insight-item"
                   onClick={() =>
                     navigate(
-                      index === 0 ? 'tasks' : 'deals',
+                      insight.page,
                     )
                   }
                 >
@@ -314,8 +580,13 @@ export function Dashboard({
                     className={`signal-dot ${insight.tone}`}
                   />
 
-                  <strong>{insight.title}</strong>
-                  <small>{insight.detail}</small>
+                  <strong>
+                    {insight.title}
+                  </strong>
+
+                  <small>
+                    {insight.detail}
+                  </small>
 
                   <ArrowUpRight
                     className="insight-arrow"
@@ -327,9 +598,14 @@ export function Dashboard({
 
             <div className="tiny-pill">
               <span className="live-dot" />
-              Análisis basado en reglas · Sin IA externa
+
+              Análisis basado en reglas
+              {' · '}
+              Sin IA externa
             </div>
           </div>
+
+          {/* INDICADOR DE ACTIVIDAD */}
 
           <div className="panel performance-panel">
             <div className="performance-head">
@@ -340,8 +616,11 @@ export function Dashboard({
               />
 
               <button
+                type="button"
                 className="icon-btn small"
-                onClick={() => navigate('insights')}
+                onClick={() =>
+                  navigate('insights')
+                }
                 title="Ver métricas"
               >
                 <ArrowUpRight size={16} />
@@ -353,26 +632,36 @@ export function Dashboard({
             <div className="performance-footer">
               <span>
                 <CircleCheck size={15} />
-                {won.length} ventas ganadas
+                {won.length}
+                {' '}
+                ventas ganadas
               </span>
 
               <span>
                 <Clock3 size={15} />
-                {pending.length} pendientes
+                {pending.length}
+                {' '}
+                tareas pendientes
               </span>
             </div>
           </div>
+
+          {/* PRÓXIMAS TAREAS */}
 
           <div className="panel next-panel">
             <div className="panel-heading">
               <SectionTitle
                 icon={<CalendarDays size={18} />}
                 title="Próximas acciones"
+                description="Seguimientos pendientes"
               />
 
               <button
+                type="button"
                 className="text-action"
-                onClick={() => navigate('tasks')}
+                onClick={() =>
+                  navigate('tasks')
+                }
               >
                 Ver todas
                 <ArrowRight size={14} />
@@ -381,15 +670,15 @@ export function Dashboard({
 
             <div className="next-tasks">
               {pending
-                .sort((a, b) =>
-                  a.dueDate.localeCompare(b.dueDate),
-                )
                 .slice(0, 4)
                 .map((task) => (
                   <button
                     key={task.id}
+                    type="button"
                     className="next-task"
-                    onClick={() => navigate('tasks')}
+                    onClick={() =>
+                      navigate('tasks')
+                    }
                   >
                     <span
                       className={`next-icon ${
@@ -406,13 +695,11 @@ export function Dashboard({
                     </span>
 
                     <span>
-                      <strong>{task.title}</strong>
+                      <strong>
+                        {task.title}
+                      </strong>
 
                       <small>
-                        {overdue(task.dueDate)
-                          ? 'Vencida · '
-                          : ''}
-
                         {task.dueDate
                           ? new Date(
                               `${task.dueDate}T12:00:00`,
@@ -441,13 +728,20 @@ export function Dashboard({
             <span>✦</span>
 
             <p>
-              Un buen proceso comercial no solo muestra números:
-              deja claro{' '}
-              <strong>cuál es el próximo paso.</strong>
+              Un buen proceso comercial no
+              solo muestra números: deja
+              claro{' '}
+              <strong>
+                cuál es el próximo paso.
+              </strong>
             </p>
           </div>
         </aside>
       </div>
+
+      {/* ======================================
+          RESUMEN INFERIOR
+      ====================================== */}
 
       <div className="bottom-strip">
         <span className="strip-icon">
@@ -455,18 +749,24 @@ export function Dashboard({
         </span>
 
         <span>
-          <strong>Todo conectado.</strong> Cada cambio en
-          oportunidades y tareas se refleja en tus métricas.
+          <strong>Todo conectado.</strong>
+          {' '}
+          Las oportunidades y tareas
+          actualizan automáticamente
+          las métricas de NEXO.
         </span>
 
         <Tag tone="green">
-          Datos guardados en tu navegador
+          Datos de demostración
         </Tag>
 
         <span className="strip-time">
-          Última actividad:{' '}
+          Última actividad:
+          {' '}
           {data.activities.length
-            ? fmtDateTime(data.activities[0].createdAt)
+            ? fmtDateTime(
+                data.activities[0].createdAt,
+              )
             : 'Sin actividad'}
         </span>
       </div>

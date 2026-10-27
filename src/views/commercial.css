@@ -1,0 +1,521 @@
+
+/* ============================================
+   NEXO CRM
+   BLOQUE 3 — DASHBOARD Y KANBAN COMERCIAL
+============================================ */
+
+/* ============================================
+   PRIORIDADES DEL DASHBOARD
+============================================ */
+
+.workday-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  border-color: #34517d;
+
+  background:
+    radial-gradient(
+      ellipse at 95% 0%,
+      rgba(69, 120, 240, 0.13),
+      transparent 55%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(17, 32, 65, 0.98),
+      rgba(13, 24, 49, 0.98)
+    );
+}
+
+.workday-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.workday-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 7px 11px;
+
+  border: 1px solid #38547e;
+  border-radius: 999px;
+
+  background: rgba(65, 108, 187, 0.14);
+
+  color: #b7d2ff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ============================================
+   LISTADO DE PRIORIDADES
+============================================ */
+
+.workday-list {
+  display: grid;
+  gap: 9px;
+}
+
+.workday-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+
+  border: 1px solid #2a416b;
+  border-radius: 11px;
+
+  background: rgba(22, 39, 77, 0.72);
+
+  color: #edf3ff;
+  text-align: left;
+  cursor: pointer;
+
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.workday-item:hover {
+  background: rgba(32, 56, 106, 0.85);
+  border-color: #557ab3;
+  transform: translateY(-1px);
+}
+
+.workday-item:focus-visible {
+  outline: 2px solid #8fb7ff;
+  outline-offset: 2px;
+}
+
+.workday-item-icon {
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 36px;
+
+  width: 36px;
+  height: 36px;
+
+  border-radius: 10px;
+
+  background: rgba(255, 169, 102, 0.12);
+  color: #ffbd85;
+}
+
+.workday-today .workday-item-icon {
+  background: rgba(88, 151, 255, 0.13);
+  color: #8dbbff;
+}
+
+.workday-item-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+
+  min-width: 0;
+}
+
+.workday-item-content strong {
+  color: #f3f6ff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.workday-item-content small {
+  color: #a6b8da;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.workday-item > svg:last-child {
+  flex-shrink: 0;
+  color: #88adf1;
+}
+
+.workday-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  padding: 17px;
+
+  border: 1px solid rgba(60, 182, 147, 0.22);
+  border-radius: 11px;
+
+  background: rgba(37, 135, 113, 0.09);
+}
+
+.workday-empty > svg {
+  flex-shrink: 0;
+  color: #5bd5ae;
+}
+
+.workday-empty strong {
+  color: #d9fff0;
+  font-size: 12px;
+}
+
+.workday-empty p {
+  margin: 5px 0 0;
+
+  color: #a4c4bc;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ============================================
+   PIE DE PRIORIDADES
+============================================ */
+
+.workday-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  padding-top: 12px;
+
+  border-top: 1px solid rgba(135, 164, 219, 0.13);
+}
+
+.workday-footer > span {
+  color: #98abc9;
+  font-size: 11px;
+}
+
+/* ============================================
+   CONTENEDORES DEL PIPELINE
+============================================ */
+
+.deal-card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.deal-card-stack > * {
+  min-width: 0;
+}
+
+/* ============================================
+   PRÓXIMO SEGUIMIENTO
+============================================ */
+
+.deal-follow-up {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  padding: 10px 11px;
+
+  border: 1px solid rgba(89, 125, 190, 0.22);
+  border-radius: 9px;
+
+  background: rgba(14, 25, 51, 0.88);
+}
+
+.deal-follow-up > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+
+  color: #88a9e9;
+}
+
+.deal-follow-up > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  min-width: 0;
+}
+
+.deal-follow-up strong {
+  color: #dce7ff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.deal-follow-up small {
+  color: #91a4c8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.follow-up-overdue {
+  border-color: rgba(255, 126, 138, 0.3);
+  background: rgba(103, 31, 58, 0.16);
+}
+
+.follow-up-overdue > svg,
+.follow-up-overdue small {
+  color: #ff9eaa;
+}
+
+.follow-up-today {
+  border-color: rgba(255, 194, 112, 0.3);
+  background: rgba(109, 69, 29, 0.15);
+}
+
+.follow-up-today > svg,
+.follow-up-today small {
+  color: #f9c18b;
+}
+
+.follow-up-scheduled {
+  border-color: rgba(83, 149, 244, 0.25);
+}
+
+.follow-up-missing {
+  border-style: dashed;
+  border-color: rgba(160, 171, 206, 0.34);
+}
+
+.follow-up-missing > svg {
+  color: #9faac6;
+}
+
+.follow-up-closed {
+  opacity: 0.75;
+}
+
+.deal-closing-alert {
+  padding: 7px 10px;
+
+  border: 1px solid rgba(255, 125, 148, 0.18);
+  border-radius: 8px;
+
+  background: rgba(116, 42, 69, 0.16);
+
+  color: #ffb0bb;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ============================================
+   ACLARACIÓN DEL PIPELINE RESUMIDO
+============================================ */
+
+.commercial-board-note {
+  margin-top: 12px;
+
+  color: #879bbd;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ============================================
+   BARRA DE HERRAMIENTAS DE OPORTUNIDADES
+============================================ */
+
+.commercial-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 13px;
+}
+
+.commercial-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.commercial-filter {
+  max-width: 210px;
+  min-height: 38px;
+
+  cursor: pointer;
+}
+
+/* ============================================
+   TABLA DE OPORTUNIDADES
+============================================ */
+
+.table-follow-up {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  min-width: 135px;
+  max-width: 240px;
+}
+
+.table-follow-up strong {
+  color: #dce7ff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.table-follow-up small {
+  color: #99acca;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.table-follow-up.follow-up-overdue small {
+  color: #ffa8b1;
+}
+
+.table-follow-up.follow-up-today small {
+  color: #f5c290;
+}
+
+.table-follow-up.follow-up-missing small {
+  color: #a6b2cf;
+}
+
+/* ============================================
+   ESTADOS Y MENSAJES
+============================================ */
+
+.commercial-empty {
+  padding: 12px 16px;
+}
+
+.commercial-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+
+  margin-top: 14px;
+  padding: 14px 16px;
+
+  border: 1px solid rgba(111, 139, 208, 0.24);
+  border-radius: 11px;
+
+  background: rgba(34, 51, 91, 0.22);
+
+  color: #afbfdd;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.commercial-notice > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #93b8ff;
+}
+
+.commercial-notice strong {
+  color: #e3ebff;
+}
+
+/* ============================================
+   MEJORAS DE INTERACCIÓN
+============================================ */
+
+.commercial-toolbar button:focus-visible,
+.commercial-toolbar select:focus-visible,
+.deal-card-stack button:focus-visible {
+  outline: 2px solid #92b9ff;
+  outline-offset: 2px;
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+
+@media (max-width: 1100px) {
+  .commercial-toolbar {
+    align-items: stretch;
+  }
+
+  .commercial-toolbar .search-field {
+    flex: 1 1 240px;
+  }
+
+  .commercial-toolbar .toolbar-right {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .workday-head {
+    align-items: flex-start;
+  }
+
+  .commercial-toolbar .toolbar-right {
+    justify-content: flex-start;
+  }
+
+  .commercial-filter {
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .workday-panel {
+    gap: 13px;
+  }
+
+  .workday-item {
+    padding: 11px;
+    gap: 9px;
+  }
+
+  .workday-item-icon {
+    flex-basis: 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .workday-item-content strong {
+    font-size: 11px;
+  }
+
+  .workday-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .commercial-toolbar .search-field,
+  .commercial-toolbar .toolbar-right {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .commercial-filter {
+    width: 100%;
+  }
+
+  .commercial-notice {
+    padding: 12px;
+  }
+}
+
+/* ============================================
+   MOVIMIENTO REDUCIDO
+============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .workday-item {
+    transition: none;
+  }
+
+  .workday-item:hover {
+    transform: none;
+  }
+}
