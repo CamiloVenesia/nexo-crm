@@ -1,0 +1,235 @@
+
+/* ============================================
+   NEXO CRM — BLOQUE 2
+   NAVEGACIÓN Y EXPERIENCIA DE USUARIO
+============================================ */
+
+/* ============================================
+   VARIABLES
+============================================ */
+
+:root {
+  --nexo-header-height: 84px;
+}
+
+/* ============================================
+   CORRECCIÓN DE STICKY
+============================================ */
+
+/*
+  El archivo styles.css original establece
+  overflow: hidden en .app-frame.
+
+  Ese comportamiento impide que los elementos
+  sticky sigan correctamente el desplazamiento
+  de la página.
+
+  Usamos overflow: visible para restaurar
+  el comportamiento esperado.
+*/
+
+.app-frame {
+  overflow: visible;
+}
+
+/* ============================================
+   BARRA SUPERIOR
+============================================ */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+
+  height: var(--nexo-header-height);
+
+  border-radius: 20px 20px 0 0;
+
+  background: rgba(11, 16, 32, 0.97);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* ============================================
+   BARRA LATERAL DE ACCIONES RÁPIDAS
+============================================ */
+
+/*
+  Los accesos rápidos permanecen visibles
+  mientras se recorre el contenido principal.
+
+  La barra lateral deja de seguir cuando
+  termina el área de trabajo.
+*/
+
+.icon-rail {
+  position: sticky;
+
+  top: var(--nexo-header-height);
+
+  align-self: flex-start;
+
+  height: calc(
+    100dvh - var(--nexo-header-height)
+  );
+
+  flex-shrink: 0;
+}
+
+.rail-item {
+  flex-shrink: 0;
+}
+
+/* Destacar el botón principal */
+
+.rail-item[aria-label='Nueva oportunidad'] {
+  background: linear-gradient(
+    135deg,
+    #276fdb,
+    #3c86ff
+  );
+
+  color: #ffffff;
+  border-color: #6aaaff;
+}
+
+/* ============================================
+   NAVEGACIÓN RESPONSIVE
+============================================ */
+
+.mobile-nav {
+  position: sticky;
+
+  top: var(--nexo-header-height);
+
+  z-index: 119;
+
+  max-height: calc(
+    100dvh - var(--nexo-header-height)
+  );
+
+  overflow-y: auto;
+}
+
+/* ============================================
+   BÚSQUEDA GLOBAL
+============================================ */
+
+.global-search .search-dropdown {
+  max-height: min(470px, 70dvh);
+
+  overflow-y: auto;
+}
+
+.search-dropdown button {
+  cursor: pointer;
+}
+
+.search-dropdown .search-tip {
+  margin: 10px 8px;
+
+  color: #97a4c3;
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.search-dropdown .search-result-type {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #97a4c3;
+  font-size: 11px;
+}
+
+.search-dropdown .search-result-icon {
+  flex: 0 0 auto;
+
+  color: #91b8ff;
+}
+
+/* ============================================
+   ACCESIBILIDAD
+============================================ */
+
+.nav-link:focus-visible,
+.rail-item:focus-visible,
+.search-dropdown button:focus-visible,
+.floating-menu button:focus-visible {
+  outline: 2px solid #92aeff;
+
+  outline-offset: 2px;
+}
+
+/* ============================================
+   ÁREA PRINCIPAL
+============================================ */
+
+.main-area {
+  scroll-margin-top: calc(
+    var(--nexo-header-height) + 12px
+  );
+}
+
+/* ============================================
+   TABLETS
+============================================ */
+
+@media (max-width: 850px) {
+  :root {
+    --nexo-header-height: 70px;
+  }
+
+  .topbar {
+    border-radius: 11px 11px 0 0;
+  }
+}
+
+/* ============================================
+   CELULARES
+============================================ */
+
+@media (max-width: 560px) {
+  :root {
+    --nexo-header-height: 64px;
+  }
+
+  .topbar {
+    border-radius: 0;
+  }
+
+  .global-search .search-dropdown {
+    width: calc(100vw - 20px);
+
+    max-height: 60dvh;
+  }
+
+  .popover-anchor .floating-menu {
+    position: fixed;
+
+    top: calc(
+      var(--nexo-header-height) + 6px
+    );
+
+    right: 10px;
+
+    width: min(
+      330px,
+      calc(100vw - 20px)
+    );
+  }
+}
+
+/* ============================================
+   MOVIMIENTO REDUCIDO
+============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar,
+  .nav-link,
+  .rail-item {
+    transition: none;
+  }
+}
