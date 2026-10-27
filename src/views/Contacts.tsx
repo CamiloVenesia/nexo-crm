@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import {
   ArrowUpRight,
@@ -125,7 +125,8 @@ export function Contacts({
   );
 
   const relatedDealIds = useMemo(
-    () => new Set(relatedDeals.map((deal) => deal.id)),
+    () =>
+      new Set(relatedDeals.map((deal) => deal.id)),
     [relatedDeals],
   );
 
@@ -160,18 +161,6 @@ export function Contacts({
   // ============================================
   // ACTIVIDAD RELACIONADA
   // ============================================
-
-  /*
-    Los registros de actividad actuales no guardan
-    un contactId ni un dealId.
-
-    Por eso mostramos solamente movimientos que
-    mencionan el nombre del contacto, una oportunidad
-    relacionada o una de sus tareas.
-
-    Esto es orientativo y no representa un historial
-    completo asociado por identificador.
-  */
 
   const relatedActivities = useMemo(() => {
     if (!selectedContact) return [];
@@ -383,104 +372,490 @@ export function Contacts({
                   selectedContactId === contact.id;
 
                 return (
-                  <tr
-                    key={contact.id}
-                    className={
-                      selected
-                        ? 'contact-selected-row'
-                        : ''
-                    }
-                    onClick={() => onEdit(contact)}
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (
-                        event.target ===
-                          event.currentTarget &&
-                        event.key === 'Enter'
-                      ) {
-                        onEdit(contact);
+                  <Fragment key={contact.id}>
+                    {/* FILA DEL CONTACTO */}
+
+                    <tr
+                      className={
+                        selected
+                          ? 'contact-selected-row'
+                          : ''
                       }
-                    }}
-                  >
-                    <td>
-                      <div className="table-person">
-                        <Avatar
-                          name={contact.name}
-                          size={38}
-                        />
-
-                        <span>
-                          <strong>
-                            {contact.name}
-                          </strong>
-
-                          <small>
-                            {contact.email || 'Sin correo'}
-                          </small>
-                        </span>
-                      </div>
-                    </td>
-
-                    <td>
-                      <strong className="table-subtitle">
-                        {data.companies.find(
-                          (company) =>
-                            company.id ===
-                            contact.companyId,
-                        )?.name ?? 'Sin empresa'}
-                      </strong>
-
-                      <small>
-                        {contact.role || 'Sin cargo'}
-                      </small>
-                    </td>
-
-                    <td>{contact.phone || '—'}</td>
-
-                    <td>
-                      <Tag
-                        tone={
-                          contact.status === 'calificado'
-                            ? 'green'
-                            : contact.status === 'contactado'
-                              ? 'purple'
-                              : 'blue'
+                      onClick={() => onEdit(contact)}
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (
+                          event.target ===
+                            event.currentTarget &&
+                          event.key === 'Enter'
+                        ) {
+                          onEdit(contact);
                         }
-                      >
-                        {contact.status === 'nuevo'
-                          ? 'Nuevo'
-                          : contact.status === 'contactado'
-                            ? 'Contactado'
-                            : 'Calificado'}
-                      </Tag>
-                    </td>
+                      }}
+                    >
+                      <td>
+                        <div className="table-person">
+                          <Avatar
+                            name={contact.name}
+                            size={38}
+                          />
 
-                    <td>{contact.source}</td>
+                          <span>
+                            <strong>
+                              {contact.name}
+                            </strong>
 
-                    <td>
-                      <button
-                        type="button"
-                        className="contact-open-details"
-                        aria-label={`${
-                          selected ? 'Cerrar' : 'Ver'
-                        } ficha de ${contact.name}`}
-                        aria-expanded={selected}
-                        onClick={(event) => {
-                          event.stopPropagation();
+                            <small>
+                              {contact.email ||
+                                'Sin correo'}
+                            </small>
+                          </span>
+                        </div>
+                      </td>
 
-                          toggleContactDetails(
-                            contact.id,
-                          );
-                        }}
-                      >
-                        {selected
-                          ? 'Cerrar ficha'
-                          : 'Ver ficha'}
+                      <td>
+                        <strong className="table-subtitle">
+                          {data.companies.find(
+                            (company) =>
+                              company.id ===
+                              contact.companyId,
+                          )?.name ?? 'Sin empresa'}
+                        </strong>
 
-                        <ArrowUpRight size={15} />
-                      </button>
-                    </td>
-                  </tr>
+                        <small>
+                          {contact.role ||
+                            'Sin cargo'}
+                        </small>
+                      </td>
+
+                      <td>
+                        {contact.phone || '—'}
+                      </td>
+
+                      <td>
+                        <Tag
+                          tone={
+                            contact.status ===
+                            'calificado'
+                              ? 'green'
+                              : contact.status ===
+                                  'contactado'
+                                ? 'purple'
+                                : 'blue'
+                          }
+                        >
+                          {contact.status === 'nuevo'
+                            ? 'Nuevo'
+                            : contact.status ===
+                                'contactado'
+                              ? 'Contactado'
+                              : 'Calificado'}
+                        </Tag>
+                      </td>
+
+                      <td>
+                        {contact.source}
+                      </td>
+
+                      <td>
+                        <button
+                          type="button"
+                          className="contact-open-details"
+                          aria-label={`${
+                            selected
+                              ? 'Cerrar'
+                              : 'Ver'
+                          } ficha de ${contact.name}`}
+                          aria-expanded={selected}
+                          aria-controls={`contact-details-${contact.id}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+
+                            toggleContactDetails(
+                              contact.id,
+                            );
+                          }}
+                        >
+                          {selected
+                            ? 'Cerrar ficha'
+                            : 'Ver ficha'}
+
+                          <ArrowUpRight size={15} />
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* ==================================
+                        FICHA DEBAJO DEL CONTACTO
+                    ================================== */}
+
+                    {selected && selectedContact && (
+                      <tr className="contact-detail-row">
+                        <td
+                          colSpan={6}
+                          style={{
+                            padding: 0,
+                            verticalAlign: 'top',
+                            borderBottom:
+                              '1px solid #30466c',
+                          }}
+                        >
+                          <section
+                            id={`contact-details-${contact.id}`}
+                            className="contact-profile"
+                            aria-label={`Ficha comercial de ${selectedContact.name}`}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            {/* CABECERA */}
+
+                            <div className="contact-profile-header">
+                              <div className="contact-profile-identity">
+                                <Avatar
+                                  name={selectedContact.name}
+                                  size={48}
+                                />
+
+                                <div>
+                                  <span className="contact-profile-eyebrow">
+                                    FICHA COMERCIAL
+                                  </span>
+
+                                  <h3>
+                                    {selectedContact.name}
+                                  </h3>
+
+                                  <p>
+                                    {selectedContact.role ||
+                                      'Sin cargo registrado'}
+                                    {' · '}
+                                    {selectedCompany?.name ||
+                                      'Sin empresa'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="contact-profile-actions">
+                                {selectedContact.email && (
+                                  <a
+                                    className="btn btn-outline"
+                                    href={`mailto:${selectedContact.email}`}
+                                  >
+                                    <Mail size={15} />
+                                    Correo
+                                  </a>
+                                )}
+
+                                {selectedContact.phone && (
+                                  <a
+                                    className="btn btn-outline"
+                                    href={`tel:${selectedContact.phone.replace(
+                                      /[^\d+]/g,
+                                      '',
+                                    )}`}
+                                  >
+                                    <Phone size={15} />
+                                    Llamar
+                                  </a>
+                                )}
+
+                                <button
+                                  type="button"
+                                  className="btn btn-outline"
+                                  onClick={() =>
+                                    onEdit(selectedContact)
+                                  }
+                                >
+                                  <Pencil size={15} />
+                                  Editar
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="contact-profile-close"
+                                  aria-label="Cerrar ficha"
+                                  onClick={() =>
+                                    setSelectedContactId(
+                                      null,
+                                    )
+                                  }
+                                >
+                                  <X size={18} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* DATOS GENERALES */}
+
+                            <div className="contact-profile-overview">
+                              <div>
+                                <span>
+                                  Estado comercial
+                                </span>
+
+                                <strong>
+                                  {selectedContact.status ===
+                                  'nuevo'
+                                    ? 'Nuevo'
+                                    : selectedContact.status ===
+                                        'contactado'
+                                      ? 'Contactado'
+                                      : 'Calificado'}
+                                </strong>
+                              </div>
+
+                              <div>
+                                <span>Origen</span>
+
+                                <strong>
+                                  {selectedContact.source ||
+                                    'Sin origen'}
+                                </strong>
+                              </div>
+
+                              <div>
+                                <span>
+                                  Oportunidades abiertas
+                                </span>
+
+                                <strong>
+                                  {openRelatedDeals.length}
+                                </strong>
+                              </div>
+
+                              <div>
+                                <span>
+                                  Tareas pendientes vinculadas
+                                </span>
+
+                                <strong>
+                                  {pendingRelatedTasks.length}
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* OPORTUNIDADES Y TAREAS */}
+
+                            <div className="contact-profile-columns">
+                              {/* OPORTUNIDADES */}
+
+                              <div className="contact-profile-section">
+                                <h4>
+                                  <Building2 size={17} />
+                                  Oportunidades relacionadas
+                                </h4>
+
+                                {relatedDeals.length ? (
+                                  <div className="contact-profile-list">
+                                    {relatedDeals.map(
+                                      (deal) => (
+                                        <div
+                                          className="contact-profile-item"
+                                          key={deal.id}
+                                        >
+                                          <div className="contact-profile-item-main">
+                                            <strong>
+                                              {deal.title}
+                                            </strong>
+
+                                            <small>
+                                              {deal.owner}
+                                              {' · '}
+                                              Cierre:{' '}
+                                              {fmtDate(
+                                                deal.dueDate,
+                                              )}
+                                            </small>
+                                          </div>
+
+                                          <StageBadge
+                                            stage={
+                                              deal.stage
+                                            }
+                                          />
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="contact-profile-empty">
+                                    Este contacto todavía no
+                                    tiene oportunidades
+                                    vinculadas.
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* TAREAS */}
+
+                              <div className="contact-profile-section">
+                                <h4>
+                                  <ClipboardList
+                                    size={17}
+                                  />
+                                  Tareas relacionadas
+                                </h4>
+
+                                {relatedTasks.length ? (
+                                  <div className="contact-profile-list">
+                                    {relatedTasks.map(
+                                      (task) => {
+                                        const isLate =
+                                          !task.done &&
+                                          overdue(
+                                            task.dueDate,
+                                          );
+
+                                        const isToday =
+                                          !task.done &&
+                                          todayDue(
+                                            task.dueDate,
+                                          );
+
+                                        return (
+                                          <div
+                                            className="contact-profile-item"
+                                            key={task.id}
+                                          >
+                                            <div className="contact-profile-item-main">
+                                              <strong>
+                                                {task.title}
+                                              </strong>
+
+                                              <small
+                                                className={
+                                                  isLate
+                                                    ? 'danger-text'
+                                                    : ''
+                                                }
+                                              >
+                                                <CalendarDays
+                                                  size={12}
+                                                />
+
+                                                {task.done
+                                                  ? 'Completada · '
+                                                  : isLate
+                                                    ? 'Vencida · '
+                                                    : isToday
+                                                      ? 'Hoy · '
+                                                      : ''}
+
+                                                {fmtDate(
+                                                  task.dueDate,
+                                                )}
+                                              </small>
+                                            </div>
+
+                                            <Tag
+                                              tone={
+                                                task.done
+                                                  ? 'green'
+                                                  : task.priority ===
+                                                      'alta'
+                                                    ? 'red'
+                                                    : 'purple'
+                                              }
+                                            >
+                                              {task.done
+                                                ? 'Hecha'
+                                                : task.priority ===
+                                                    'alta'
+                                                  ? 'Alta'
+                                                  : task.priority ===
+                                                      'media'
+                                                    ? 'Media'
+                                                    : 'Baja'}
+                                            </Tag>
+                                          </div>
+                                        );
+                                      },
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="contact-profile-empty">
+                                    No hay tareas asociadas
+                                    a las oportunidades de
+                                    este contacto.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* NOTAS */}
+
+                            {selectedContact.notes.trim() && (
+                              <div className="contact-profile-notes">
+                                <strong>
+                                  Notas del contacto
+                                </strong>
+
+                                <p>
+                                  {selectedContact.notes}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* ACTIVIDAD RECIENTE */}
+
+                            <div className="contact-profile-section contact-profile-history">
+                              <h4>
+                                <FileClock size={17} />
+                                Menciones en la actividad
+                                reciente
+                              </h4>
+
+                              {relatedActivities.length ? (
+                                <div className="contact-profile-list">
+                                  {relatedActivities.map(
+                                    (activity) => (
+                                      <div
+                                        className="contact-profile-item"
+                                        key={activity.id}
+                                      >
+                                        <div className="contact-profile-item-main">
+                                          <strong>
+                                            {activity.title}
+                                          </strong>
+
+                                          <small>
+                                            {activity.detail}
+                                          </small>
+                                        </div>
+
+                                        <span className="contact-profile-time">
+                                          {fmtDateTime(
+                                            activity.createdAt,
+                                          )}
+                                        </span>
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="contact-profile-empty">
+                                  No se encontraron menciones
+                                  relacionadas en la
+                                  actividad reciente.
+                                </p>
+                              )}
+
+                              <p className="contact-profile-disclaimer">
+                                Las menciones se identifican
+                                por nombres y títulos
+                                coincidentes. Esta demo
+                                todavía no vincula cada
+                                movimiento directamente
+                                al contacto.
+                              </p>
+                            </div>
+                          </section>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -494,310 +869,6 @@ export function Contacts({
             />
           )}
         </div>
-
-        {/* ====================================
-            FICHA COMERCIAL
-        ==================================== */}
-
-        {selectedContact && (
-          <section
-            className="contact-profile"
-            aria-label={`Ficha comercial de ${selectedContact.name}`}
-          >
-            {/* CABECERA */}
-
-            <div className="contact-profile-header">
-              <div className="contact-profile-identity">
-                <Avatar
-                  name={selectedContact.name}
-                  size={48}
-                />
-
-                <div>
-                  <span className="contact-profile-eyebrow">
-                    FICHA COMERCIAL
-                  </span>
-
-                  <h3>{selectedContact.name}</h3>
-
-                  <p>
-                    {selectedContact.role ||
-                      'Sin cargo registrado'}
-                    {' · '}
-                    {selectedCompany?.name ||
-                      'Sin empresa'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="contact-profile-actions">
-                {selectedContact.email && (
-                  <a
-                    className="btn btn-outline"
-                    href={`mailto:${selectedContact.email}`}
-                  >
-                    <Mail size={15} />
-                    Correo
-                  </a>
-                )}
-
-                {selectedContact.phone && (
-                  <a
-                    className="btn btn-outline"
-                    href={`tel:${selectedContact.phone.replace(
-                      /[^\d+]/g,
-                      '',
-                    )}`}
-                  >
-                    <Phone size={15} />
-                    Llamar
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() =>
-                    onEdit(selectedContact)
-                  }
-                >
-                  <Pencil size={15} />
-                  Editar
-                </button>
-
-                <button
-                  type="button"
-                  className="contact-profile-close"
-                  aria-label="Cerrar ficha"
-                  onClick={() =>
-                    setSelectedContactId(null)
-                  }
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* INFORMACIÓN GENERAL */}
-
-            <div className="contact-profile-overview">
-              <div>
-                <span>Estado comercial</span>
-
-                <strong>
-                  {selectedContact.status === 'nuevo'
-                    ? 'Nuevo'
-                    : selectedContact.status ===
-                        'contactado'
-                      ? 'Contactado'
-                      : 'Calificado'}
-                </strong>
-              </div>
-
-              <div>
-                <span>Origen</span>
-                <strong>
-                  {selectedContact.source || 'Sin origen'}
-                </strong>
-              </div>
-
-              <div>
-                <span>Oportunidades abiertas</span>
-                <strong>
-                  {openRelatedDeals.length}
-                </strong>
-              </div>
-
-              <div>
-                <span>Tareas pendientes vinculadas</span>
-                <strong>
-                  {pendingRelatedTasks.length}
-                </strong>
-              </div>
-            </div>
-
-            {/* OPORTUNIDADES Y TAREAS */}
-
-            <div className="contact-profile-columns">
-              <div className="contact-profile-section">
-                <h4>
-                  <Building2 size={17} />
-                  Oportunidades relacionadas
-                </h4>
-
-                {relatedDeals.length ? (
-                  <div className="contact-profile-list">
-                    {relatedDeals.map((deal) => (
-                      <div
-                        className="contact-profile-item"
-                        key={deal.id}
-                      >
-                        <div className="contact-profile-item-main">
-                          <strong>
-                            {deal.title}
-                          </strong>
-
-                          <small>
-                            {deal.owner}
-                            {' · '}
-                            Cierre: {fmtDate(deal.dueDate)}
-                          </small>
-                        </div>
-
-                        <StageBadge
-                          stage={deal.stage}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="contact-profile-empty">
-                    Este contacto todavía no tiene
-                    oportunidades vinculadas.
-                  </p>
-                )}
-              </div>
-
-              <div className="contact-profile-section">
-                <h4>
-                  <ClipboardList size={17} />
-                  Tareas relacionadas
-                </h4>
-
-                {relatedTasks.length ? (
-                  <div className="contact-profile-list">
-                    {relatedTasks.map((task) => {
-                      const isLate =
-                        !task.done &&
-                        overdue(task.dueDate);
-
-                      const isToday =
-                        !task.done &&
-                        todayDue(task.dueDate);
-
-                      return (
-                        <div
-                          className="contact-profile-item"
-                          key={task.id}
-                        >
-                          <div className="contact-profile-item-main">
-                            <strong>
-                              {task.title}
-                            </strong>
-
-                            <small
-                              className={
-                                isLate
-                                  ? 'danger-text'
-                                  : ''
-                              }
-                            >
-                              <CalendarDays size={12} />
-
-                              {task.done
-                                ? 'Completada · '
-                                : isLate
-                                  ? 'Vencida · '
-                                  : isToday
-                                    ? 'Hoy · '
-                                    : ''}
-
-                              {fmtDate(task.dueDate)}
-                            </small>
-                          </div>
-
-                          <Tag
-                            tone={
-                              task.done
-                                ? 'green'
-                                : task.priority ===
-                                    'alta'
-                                  ? 'red'
-                                  : 'purple'
-                            }
-                          >
-                            {task.done
-                              ? 'Hecha'
-                              : task.priority === 'alta'
-                                ? 'Alta'
-                                : task.priority ===
-                                    'media'
-                                  ? 'Media'
-                                  : 'Baja'}
-                          </Tag>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="contact-profile-empty">
-                    No hay tareas asociadas a
-                    las oportunidades de este contacto.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* NOTAS */}
-
-            {selectedContact.notes.trim() && (
-              <div className="contact-profile-notes">
-                <strong>Notas del contacto</strong>
-
-                <p>{selectedContact.notes}</p>
-              </div>
-            )}
-
-            {/* ACTIVIDAD */}
-
-            <div className="contact-profile-section contact-profile-history">
-              <h4>
-                <FileClock size={17} />
-                Menciones en la actividad reciente
-              </h4>
-
-              {relatedActivities.length ? (
-                <div className="contact-profile-list">
-                  {relatedActivities.map((activity) => (
-                    <div
-                      className="contact-profile-item"
-                      key={activity.id}
-                    >
-                      <div className="contact-profile-item-main">
-                        <strong>
-                          {activity.title}
-                        </strong>
-
-                        <small>
-                          {activity.detail}
-                        </small>
-                      </div>
-
-                      <span className="contact-profile-time">
-                        {fmtDateTime(
-                          activity.createdAt,
-                        )}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="contact-profile-empty">
-                  No se encontraron menciones
-                  relacionadas en la actividad reciente.
-                </p>
-              )}
-
-              <p className="contact-profile-disclaimer">
-                Las menciones se identifican por
-                nombres y títulos coincidentes.
-                Esta demo todavía no vincula
-                cada movimiento directamente
-                al contacto.
-              </p>
-            </div>
-          </section>
-        )}
       </div>
 
       <div className="hint-row">
