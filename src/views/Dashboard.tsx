@@ -1,93 +1,116 @@
 
 import type { ReactNode } from 'react';
-
 import {
+  Activity as ActivityIcon,
   ArrowRight,
-  ArrowUpRight,
   BadgeCheck,
-  CalendarDays,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
   CircleAlert,
-  CircleCheck,
   Clock3,
   GitBranch,
-  Info,
   Plus,
-  Sparkles,
   TrendingUp,
-  Zap,
 } from 'lucide-react';
 
-import { useCRM } from '../lib/store';
-import { calculateReportMetrics } from '../lib/reporting';
-import { fmtDateTime, money, overdue, todayDue } from '../lib/utils';
-import type { Deal, Page } from '../types';
-import { STAGES } from '../types';
-
 import {
-  DealCard,
   PageHeading,
   SectionTitle,
-  Tag,
+  StageBadge,
 } from '../components/Shared';
-
 import {
   ForecastChart,
-  PerformanceRing,
   RevenueLegend,
 } from '../components/Charts';
+import { useCRM } from '../lib/store';
+import { calculateReportMetrics } from '../lib/reporting';
+import {
+  fmtDate,
+  fmtDateTime,
+  money,
+  overdue,
+  todayDue,
+  toDateInput,
+} from '../lib/utils';
+import type { Deal, Page, Task } from '../types';
+import { STAGES } from '../types';
 
-import './dashboard-clarity.css';
+import './dashboard-home.css';
 
-interface DashboardMetricProps {
-  label: string;
-  value: string;
-  description: string;
-  icon: ReactNode;
-}
+type DashboardProps = {
+  navigate: (page: Page) => void;
+  newDeal: () => void;
+  editDeal: (deal: Deal) => void;
+};
 
-/**
- * Una descripción es un dato contextual, no una tendencia.
- * Conservamos las clases de las tarjetas sin mostrar flechas ficticias.
- */
-function DashboardMetric({
+function Metric({
   label,
   value,
-  description,
+  detail,
   icon,
-}: DashboardMetricProps) {
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  icon: ReactNode;
+}) {
   return (
-    <div className="stat-tile">
+    <div className="stat-tile nexo-home-metric">
       <div className="stat-top">
         <span>{label}</span>
-        <span className="stat-icon" aria-hidden="true">{icon}</span>
+        <span className="stat-icon">{icon}</span>
       </div>
-      <div className="stat-number">{value}</div>
-      <div className="dashboard-metric-description">{description}</div>
+      <div className="stat-number" title={value}>
+        {value}
+      </div>
+      <p>{detail}</p>
     </div>
   );
 }
 
-interface DashboardProps {
-  navigate: (page: Page) => void;
-  newDeal: () => void;
-  editDeal: (deal: Deal) => void;
+function taskOrder(task: Task, today: string): number {
+  if (task.dueDate && task.dueDate < today) return 0;
+  if (task.dueDate === today) return 1;
+  return 2;
 }
 
-export function Dashboard({ navigate, newDeal, editDeal }: DashboardProps) {
-  const { data, changeStage } = useCRM();
-  const metrics = calculateReportMetrics(data.deals);
+export function Dashboard({
+  navigate,
+  newDeal,
+  editDeal,
+}: DashboardProps) {
+  const { data, toggleTask } = useCRM();
   const currency = data.settings.currency;
+  const today = toDateInput(new Date());
+  const metrics = calculateReportMetrics(data.deals);
 
-  const active = data.deals.filter(
-    (deal) => deal.stage !== 'ganado' && deal.stage !== 'perdido',
+  const openDeals = data.deals.filter(
+    (deal) =>
+      deal.stage !== 'ganado' &&
+      deal.stage !== 'perdido',
   );
 
   const pending = data.tasks.filter((task) => !task.done);
-  const lateTasks = pending.filter((task) => overdue(task.dueDate));
-  const todayTasks = pending.filter((task) => todayDue(task.dueDate));
-  const lateClosings = active.filter((deal) => overdue(deal.dueDate));
+  const late = pending.filter((task) => overdue(task.dueDate));
+  const dueToday = pending.filter((task) => todayDue(task.dueDate));
+  const pendingAttention = late.length + dueToday.length;
 
-  const nextTasks = [...pending]
+  const importantTasks = [...pending]
+    .sort(
+      (a, b) =>
+        taskOrder(a, today) - taskOrder(b, today) ||
+        (a.dueDate || '9999-12-31').localeCompare(
+          b.dueDate || '9999-12-31',
+        ) ||
+        (
+          { alta: 0, media: 1, baja: 2 }[a.priority] -
+          { alta: 0, media: 1, baja: 2 }[b.priority]
+        ),
+    )
+    .slice(0, 5);
+
+  const relevantDeals = [...openDeals]
     .sort((a, b) =>
       (a.dueDate || '9999-12-31').localeCompare(
         b.dueDate || '9999-12-31',
@@ -95,334 +118,109 @@ export function Dashboard({ navigate, newDeal, editDeal }: DashboardProps) {
     )
     .slice(0, 4);
 
-  const insights = [
-    lateTasks.length + todayTasks.length > 0
-      ? {
-          title: `${lateTasks.length + todayTasks.length} seguimiento(s) para revisar`,
-          detail: `${lateTasks.length} tarea(s) vencida(s) y ${todayTasks.length} para hoy.`,
-          tone: 'orange',
-          page: 'tasks' as Page,
-        }
-      : {
-          title: 'Seguimientos al día',
-          detail: 'No hay tareas vencidas ni tareas pendientes para hoy.',
-          tone: 'green',
-          page: 'tasks' as Page,
-        },
-
-    lateClosings.length > 0
-      ? {
-          title: `${lateClosings.length} cierre(s) para revisar`,
-          detail: 'Oportunidades abiertas que superaron su fecha estimada de cierre.',
-          tone: 'blue',
-          page: 'deals' as Page,
-        }
-      : {
-          title: 'Fechas de cierre al día',
-          detail: 'Ninguna oportunidad abierta tiene un cierre estimado vencido.',
-          tone: 'blue',
-          page: 'deals' as Page,
-        },
-  ];
-
   return (
-    <>
+    <div className="nexo-home">
       <PageHeading
-        eyebrow="WORKSPACE / RESUMEN"
-        title="Tu operación, en una sola vista."
-        subtitle="Una lectura clara de tus oportunidades, clientes y próximos pasos."
+        eyebrow="WORKSPACE / INICIO"
+        title="Tu negocio, al día."
+        subtitle="Lo importante para hoy, sin perder de vista tus clientes y oportunidades."
         action={
           <button
             type="button"
             className="btn btn-primary"
             onClick={newDeal}
           >
-            <Plus size={17} />
+            <Plus size={16} />
             Nueva oportunidad
           </button>
         }
-        secondary={
-          <span className="date-chip">
-            <CalendarDays size={15} />
-            {new Date().toLocaleDateString('es-AR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-          </span>
-        }
       />
 
-      <div className="dashboard-layout">
-        <div className="dashboard-main">
-          {/* INDICADORES SIN FLECHAS DE TENDENCIA FICTICIAS */}
-
-          <div className="kpi-grid">
-            <DashboardMetric
-              label="Oportunidades activas"
-              value={String(metrics.openCount).padStart(2, '0')}
-              description={`${data.deals.length} oportunidades registradas`}
-              icon={<GitBranch size={16} />}
-            />
-
-            <DashboardMetric
-              label="Valor del pipeline"
-              value={money(metrics.openValue, currency, true)}
-              description={`Importe de oportunidades abiertas · ${currency}`}
-              icon={<TrendingUp size={16} />}
-            />
-
-            <DashboardMetric
-              label="Tasa de cierre"
-              value={
-                metrics.closeRate === null
-                  ? '—'
-                  : `${metrics.closeRate}%`
-              }
-              description={`${metrics.wonCount} ganadas de ${metrics.closedCount} cerradas`}
-              icon={<BadgeCheck size={16} />}
-            />
-
-            <DashboardMetric
-              label="Proyección ponderada"
-              value={money(metrics.weightedOpenValue, currency, true)}
-              description={`Importe abierto × probabilidad · ${currency}`}
-              icon={<Zap size={16} />}
-            />
-          </div>
-
-          {/* PIPELINE ORIGINAL */}
-
-          <div className="panel board-panel">
-            <div className="panel-heading">
-              <SectionTitle
-                icon={<GitBranch size={18} />}
-                title="Pipeline de ventas"
-                description="Las oportunidades, organizadas por etapa"
-              />
-
-              <button
-                type="button"
-                className="text-action"
-                onClick={() => navigate('deals')}
-              >
-                Ver pipeline completo
-                <ArrowRight size={15} />
-              </button>
-            </div>
-
-            <div className="board-scroll dashboard-board">
-              {STAGES.slice(0, 4).map((stage) => {
-                const list = active.filter(
-                  (deal) => deal.stage === stage.id,
-                );
-
-                const total = list.reduce(
-                  (sum, deal) => sum + deal.amount,
-                  0,
-                );
-
-                return (
-                  <div
-                    key={stage.id}
-                    className="board-column"
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-
-                      const id = event.dataTransfer.getData('text/plain');
-
-                      if (
-                        data.deals.some((deal) => deal.id === id)
-                      ) {
-                        changeStage(id, stage.id);
-                      }
-                    }}
-                  >
-                    <div className="column-heading">
-                      <div>
-                        <span
-                          className="stage-dot"
-                          style={{ background: stage.color }}
-                        />
-
-                        {stage.label}
-
-                        <span className="column-count">
-                          {list.length}
-                        </span>
-                      </div>
-
-                      <strong>
-                        {money(total, currency, true)}
-                      </strong>
-                    </div>
-
-                    {list.length ? (
-                      list.slice(0, 3).map((deal) => (
-                        <DealCard
-                          key={deal.id}
-                          deal={deal}
-                          onClick={() => editDeal(deal)}
-                        />
-                      ))
-                    ) : (
-                      <div className="board-empty">
-                        Arrastrá una oportunidad aquí
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* PROYECCIÓN COMERCIAL YA CORREGIDA */}
-
-          <div className="panel forecast-panel">
-            <div className="panel-heading">
-              <SectionTitle
-                icon={<TrendingUp size={18} />}
-                title="Proyección comercial"
-                description="Valores de oportunidades agrupados por fecha estimada de cierre"
-              />
-
-              <RevenueLegend />
-            </div>
-
-            <ForecastChart height={224} />
-
-            <div className="panel-footnote">
-              Los valores son estimaciones basadas en oportunidades.
-              Las ventas ganadas no equivalen necesariamente
-              a dinero cobrado.
-            </div>
-          </div>
+      <section
+        className="nexo-home-focus"
+        aria-label="Resumen de prioridades"
+      >
+        <div className="nexo-home-focus-icon">
+          <CalendarClock size={22} />
         </div>
 
-        {/* COLUMNA DERECHA */}
+        <div className="nexo-home-focus-copy">
+          <span className="nexo-home-eyebrow">
+            TU PRIORIDAD DE HOY
+          </span>
 
-        <aside className="dashboard-side">
-          {/* RADAR COMERCIAL */}
+          <h2>
+            {pendingAttention
+              ? `${pendingAttention} tarea${
+                  pendingAttention === 1 ? '' : 's'
+                } necesita${
+                  pendingAttention === 1 ? '' : 'n'
+                } atención`
+              : 'Todo al día por ahora'}
+          </h2>
 
-          <div className="panel intelligence-panel">
-            <SectionTitle
-              icon={<Sparkles size={18} />}
-              title="Radar comercial"
-              description="Señales para decidir qué hacer ahora"
-            />
+          <p>
+            {late.length} vencidas · {dueToday.length} para hoy
+            {' · '}
+            {openDeals.length} oportunidades abiertas
+          </p>
+        </div>
 
-            <div className="insight-stack">
-              {insights.map((insight) => (
-                <button
-                  key={insight.page}
-                  type="button"
-                  className="insight-item"
-                  onClick={() => navigate(insight.page)}
-                >
-                  <span className={`signal-dot ${insight.tone}`} />
-                  <strong>{insight.title}</strong>
-                  <small>{insight.detail}</small>
-                  <ArrowUpRight
-                    className="insight-arrow"
-                    size={15}
-                  />
-                </button>
-              ))}
-            </div>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={() => navigate('tasks')}
+        >
+          Ver tareas
+          <ArrowRight size={15} />
+        </button>
+      </section>
 
-            <div className="tiny-pill">
-              <span className="live-dot" />
-              Análisis basado en reglas · Sin IA externa
-            </div>
-          </div>
+      <section
+        className="kpi-grid nexo-home-stats"
+        aria-label="Indicadores principales"
+      >
+        <Metric
+          label="Clientes"
+          value={String(data.companies.length)}
+          detail="Empresas registradas"
+          icon={<Building2 size={17} />}
+        />
 
-          {/* PULSO COMERCIAL CON EXPLICACIÓN */}
+        <Metric
+          label="Negocios en curso"
+          value={String(metrics.openCount)}
+          detail="Oportunidades abiertas"
+          icon={<GitBranch size={17} />}
+        />
 
-          <div className="panel performance-panel">
-            <div className="performance-head">
-              <SectionTitle
-                icon={<Zap size={18} />}
-                title="Salud comercial"
-                description="Indicador orientativo de actividad"
-              />
+        <Metric
+          label="Valor del pipeline"
+          value={money(metrics.openValue, currency, true)}
+          detail="Importe potencial, no cobrado"
+          icon={<TrendingUp size={17} />}
+        />
 
-              <button
-                type="button"
-                className="icon-btn small"
-                onClick={() => navigate('insights')}
-                title="Ver reportes"
-                aria-label="Ver reportes"
-              >
-                <ArrowUpRight size={16} />
-              </button>
-            </div>
+        <Metric
+          label="Ventas ganadas"
+          value={String(metrics.wonCount)}
+          detail={`${money(
+            metrics.wonValue,
+            currency,
+            true,
+          )} en negocios ganados`}
+          icon={<BadgeCheck size={17} />}
+        />
+      </section>
 
-            <PerformanceRing />
-
-            <details className="dashboard-pulse-explanation">
-              <summary>
-                <Info size={14} aria-hidden="true" />
-                ¿Cómo se calcula este indicador?
-              </summary>
-
-              <div className="dashboard-pulse-content">
-                <p>
-                  Es un puntaje orientativo de NEXO calculado
-                  con reglas internas. No mide ingresos reales
-                  ni predice el resultado de una venta.
-                </p>
-
-                <ul>
-                  <li>
-                    <strong>Tasa de cierre:</strong>{' '}
-                    {metrics.closeRate === null
-                      ? 'sin oportunidades cerradas'
-                      : `${metrics.closeRate}%`}
-                    {' '}— aporta hasta 48 puntos.
-                  </li>
-
-                  <li>
-                    <strong>Oportunidades abiertas:</strong>{' '}
-                    {metrics.openCount}
-                    {' '}— aportan hasta 21,6 puntos.
-                  </li>
-
-                  <li>
-                    <strong>Tareas pendientes:</strong>{' '}
-                    {pending.length}
-                    {' '}— cuanto menos pendientes, mayor aporte,
-                    hasta 25 puntos.
-                  </li>
-                </ul>
-
-                <p>
-                  Incluye 18 puntos de base y tiene un máximo de 99.
-                  No es una comparación con períodos anteriores.
-                </p>
-              </div>
-            </details>
-
-            <div className="performance-footer">
-              <span>
-                <CircleCheck size={15} />
-                {metrics.wonCount} ventas ganadas
-              </span>
-
-              <span>
-                <Clock3 size={15} />
-                {pending.length} tareas pendientes
-              </span>
-            </div>
-          </div>
-
-          {/* PRÓXIMAS ACCIONES */}
-
-          <div className="panel next-panel">
+      <div className="dashboard-layout nexo-home-columns">
+        <div className="dashboard-main">
+          <section className="panel nexo-home-panel">
             <div className="panel-heading">
               <SectionTitle
-                icon={<CalendarDays size={18} />}
-                title="Próximas acciones"
+                icon={<CalendarClock size={18} />}
+                title="Qué tenés que hacer"
+                description="Las próximas tareas, ordenadas por urgencia"
               />
 
               <button
@@ -430,95 +228,274 @@ export function Dashboard({ navigate, newDeal, editDeal }: DashboardProps) {
                 className="text-action"
                 onClick={() => navigate('tasks')}
               >
-                Ver todas
-                <ArrowRight size={14} />
+                Todas las tareas
+                <ArrowRight size={15} />
               </button>
             </div>
 
-            <div className="next-tasks">
-              {nextTasks.map((task) => {
-                const late = overdue(task.dueDate);
-                const today = todayDue(task.dueDate);
+            {importantTasks.length === 0 ? (
+              <div className="nexo-home-empty">
+                <CheckCircle2 size={20} />
+                No tenés tareas pendientes.
+              </div>
+            ) : (
+              <div className="nexo-home-task-list">
+                {importantTasks.map((task) => {
+                  const deal = data.deals.find(
+                    (item) => item.id === task.dealId,
+                  );
+
+                  const company = data.companies.find(
+                    (item) => item.id === deal?.companyId,
+                  );
+
+                  const isLate = overdue(task.dueDate);
+                  const isToday = todayDue(task.dueDate);
+
+                  return (
+                    <div
+                      className="nexo-home-task"
+                      key={task.id}
+                    >
+                      <button
+                        type="button"
+                        className="nexo-home-check"
+                        aria-label={`Completar tarea: ${task.title}`}
+                        title="Marcar como completada"
+                        onClick={() => toggleTask(task.id)}
+                      >
+                        <CheckCircle2 size={19} />
+                      </button>
+
+                      <div className="nexo-home-task-text">
+                        <strong>{task.title}</strong>
+                        <small>
+                          {company?.name ||
+                            deal?.title ||
+                            'Tarea general'}
+                        </small>
+                      </div>
+
+                      <span
+                        className={`nexo-home-date ${
+                          isLate
+                            ? 'is-late'
+                            : isToday
+                              ? 'is-today'
+                              : ''
+                        }`}
+                      >
+                        {isLate ? (
+                          <CircleAlert size={13} />
+                        ) : (
+                          <Clock3 size={13} />
+                        )}
+
+                        {isLate
+                          ? 'Vencida'
+                          : isToday
+                            ? 'Hoy'
+                            : task.dueDate
+                              ? fmtDate(task.dueDate)
+                              : 'Sin fecha'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="panel nexo-home-panel">
+            <div className="panel-heading">
+              <SectionTitle
+                icon={<GitBranch size={18} />}
+                title="Negocios que estás trabajando"
+                description="Oportunidades abiertas con fecha de cierre más próxima"
+              />
+
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => navigate('deals')}
+              >
+                Ver Pipeline
+                <ArrowRight size={15} />
+              </button>
+            </div>
+
+            {relevantDeals.length === 0 ? (
+              <div className="nexo-home-empty">
+                Todavía no hay oportunidades abiertas.
+              </div>
+            ) : (
+              <div className="nexo-home-deals">
+                {relevantDeals.map((deal) => {
+                  const company = data.companies.find(
+                    (item) => item.id === deal.companyId,
+                  );
+
+                  return (
+                    <button
+                      className="nexo-home-deal"
+                      type="button"
+                      key={deal.id}
+                      onClick={() => editDeal(deal)}
+                    >
+                      <span className="nexo-home-deal-main">
+                        <strong>{deal.title}</strong>
+                        <small>
+                          {company?.name ||
+                            'Sin empresa vinculada'}
+                        </small>
+                      </span>
+
+                      <StageBadge stage={deal.stage} />
+
+                      <strong className="nexo-home-deal-amount">
+                        {money(deal.amount, currency, true)}
+                      </strong>
+
+                      <ArrowRight
+                        size={15}
+                        className="nexo-home-deal-arrow"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="panel forecast-panel nexo-home-panel">
+            <div className="panel-heading">
+              <SectionTitle
+                icon={<TrendingUp size={18} />}
+                title="Proyección comercial"
+                description="Estimaciones según fechas previstas de cierre"
+              />
+
+              <RevenueLegend />
+            </div>
+
+            <ForecastChart height={180} />
+
+            <p className="nexo-home-chart-note">
+              Los importes representan oportunidades;
+              no necesariamente pagos recibidos.
+            </p>
+          </section>
+        </div>
+
+        <aside className="dashboard-side">
+          <section className="panel nexo-home-panel">
+            <div className="panel-heading">
+              <SectionTitle
+                icon={<GitBranch size={18} />}
+                title="Pipeline, de un vistazo"
+                description="En qué etapa están tus negocios"
+              />
+            </div>
+
+            <div className="nexo-home-stages">
+              {STAGES.filter(
+                (stage) =>
+                  stage.id !== 'ganado' &&
+                  stage.id !== 'perdido',
+              ).map((stage) => {
+                const count = openDeals.filter(
+                  (deal) => deal.stage === stage.id,
+                ).length;
+
+                const percent = openDeals.length
+                  ? Math.round(
+                      (count / openDeals.length) * 100,
+                    )
+                  : 0;
 
                 return (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className="next-task"
-                    onClick={() => navigate('tasks')}
+                  <div
+                    className="nexo-home-stage"
+                    key={stage.id}
                   >
-                    <span className={`next-icon ${late ? 'late' : ''}`}>
-                      {late
-                        ? <CircleAlert size={14} />
-                        : <CircleCheck size={14} />}
-                    </span>
+                    <div>
+                      <span>{stage.label}</span>
+                      <strong>{count}</strong>
+                    </div>
 
-                    <span>
-                      <strong>{task.title}</strong>
-
-                      <small>
-                        {late
-                          ? 'Vencida · '
-                          : today
-                            ? 'Hoy · '
-                            : ''}
-
-                        {task.dueDate
-                          ? new Date(
-                              `${task.dueDate}T12:00:00`,
-                            ).toLocaleDateString('es-AR', {
-                              day: 'numeric',
-                              month: 'short',
-                            })
-                          : 'Sin fecha'}
-                      </small>
-                    </span>
-                  </button>
+                    <div className="nexo-home-stage-track">
+                      <span
+                        style={{
+                          background: stage.color,
+                          width: `${percent}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 );
               })}
-
-              {pending.length === 0 && (
-                <p className="muted small-p">
-                  No hay acciones pendientes.
-                </p>
-              )}
             </div>
-          </div>
 
-          <div className="side-note">
-            <span>✦</span>
+            <button
+              className="nexo-home-panel-link"
+              type="button"
+              onClick={() => navigate('deals')}
+            >
+              Abrir el tablero de ventas
+              <ArrowRight size={15} />
+            </button>
+          </section>
 
-            <p>
-              Un buen proceso comercial no solo muestra
-              números: deja claro{' '}
-              <strong>cuál es el próximo paso.</strong>
-            </p>
-          </div>
+          <section className="panel nexo-home-panel">
+            <div className="panel-heading">
+              <SectionTitle
+                icon={<ActivityIcon size={18} />}
+                title="Últimos movimientos"
+                description="Qué cambió recientemente en NEXO"
+              />
+            </div>
+
+            {data.activities.length === 0 ? (
+              <div className="nexo-home-empty">
+                Todavía no hay movimientos registrados.
+              </div>
+            ) : (
+              <div className="nexo-home-activity-list">
+                {[...data.activities]
+                  .sort((a, b) =>
+                    b.createdAt.localeCompare(a.createdAt),
+                  )
+                  .slice(0, 5)
+                  .map((item) => (
+                    <div
+                      className="nexo-home-activity"
+                      key={item.id}
+                    >
+                      <span className="nexo-home-activity-dot" />
+
+                      <div>
+                        <strong>{item.title}</strong>
+                        <small>{item.detail}</small>
+                        <span>
+                          {fmtDateTime(item.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            <button
+              className="nexo-home-panel-link"
+              type="button"
+              onClick={() => navigate('activity')}
+            >
+              Ver todo el historial
+              <ArrowRight size={15} />
+            </button>
+          </section>
         </aside>
       </div>
-
-      <div className="bottom-strip">
-        <span className="strip-icon">
-          <BadgeCheck size={16} />
-        </span>
-
-        <span>
-          <strong>Todo conectado.</strong>{' '}
-          Cada cambio en oportunidades y tareas
-          se refleja en tus métricas.
-        </span>
-
-        <Tag tone="green">
-          Datos guardados en tu navegador
-        </Tag>
-
-        <span className="strip-time">
-          Última actividad:{' '}
-          {data.activities.length
-            ? fmtDateTime(data.activities[0].createdAt)
-            : 'Sin actividad'}
-        </span>
-      </div>
-    </>
+    </div>
   );
 }
