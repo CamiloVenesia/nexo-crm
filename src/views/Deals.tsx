@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 
 import {
   ArrowRight,
-  CalendarClock,
   Download,
   LayoutGrid,
   List,
@@ -15,10 +14,14 @@ import {
 import { useCRM } from '../lib/store';
 
 import {
-  dealNeedsAttention,
+  filterDeals,
+  getDealFocusCounts,
   getDealFollowUp,
-  nextPendingTask,
-} from '../lib/commercial';
+} from '../lib/dealFocus';
+
+import type {
+  DealFocusFilter,
+} from '../lib/dealFocus';
 
 import {
   csvDownload,
@@ -27,6 +30,7 @@ import {
   openDeals,
   overdue,
   pipelineValue,
+  toDateInput,
 } from '../lib/utils';
 
 import type { Deal } from '../types';
@@ -39,13 +43,6 @@ import {
   StageBadge,
 } from '../components/Shared';
 
-import './commercial.css';
-
-type FollowUpFilter =
-  | 'todos'
-  | 'urgentes'
-  | 'sin-seguimiento';
-
 interface DealsProps {
   onAdd: () => void;
   onEdit: (item: Deal) => void;
@@ -55,10 +52,14 @@ export function Deals({
   onAdd,
   onEdit,
 }: DealsProps) {
-  const { data, changeStage, notify } = useCRM();
+  const {
+    data,
+    changeStage,
+    notify,
+  } = useCRM();
 
   // ============================================
-  // FILTROS Y VISTAS
+  // VISTA Y FILTROS
   // ============================================
 
   const [view, setView] = useState<
@@ -66,195 +67,159 @@ export function Deals({
   >('board');
 
   const [search, setSearch] = useState('');
-  const [showClosed, setShowClosed] = useState(false);
 
-  const [
-    followUpFilter,
-    setFollowUpFilter,
-  ] = useState<FollowUpFilter>('todos');
+  const [showClosed, setShowClosed] =
+    useState(false);
 
-  const deals = useMemo(() => {
-    const query = search
-      .trim()
-      .toLocaleLowerCase('es-AR');
+  const [focus, setFocus] =
+    useState<DealFocusFilter>('todos');
 
-    return data.deals.filter((deal) => {
-      // Oportunidades cerradas
-
-      if (
-        !showClosed &&
-        ['ganado', 'perdido'].includes(
-          deal.stage,
-        )
-      ) {
-        return false;
-      }
-
-      // Empresa y contacto
-
-      const company =
-        data.companies.find(
-          (item) =>
-            item.id === deal.companyId,
-        )?.name ?? '';
-
-      const contact =
-        data.contacts.find(
-          (item) =>
-            item.id === deal.contactId,
-        )?.name ?? '';
-
-      const searchable = [
-        deal.title,
-        company,
-        contact,
-        deal.owner,
-      ]
-        .join(' ')
-        .toLocaleLowerCase('es-AR');
-
-      if (
-        query &&
-        !searchable.includes(query)
-      ) {
-        return false;
-      }
-
-      // Seguimientos urgentes
-
-      if (
-        followUpFilter === 'urgentes' &&
-        !dealNeedsAttention(
-          deal,
-          data.tasks,
-        )
-      ) {
-        return false;
-      }
-
-      // Oportunidades sin tareas pendientes
-
-      if (
-        followUpFilter ===
-          'sin-seguimiento' &&
-        nextPendingTask(
-          deal.id,
-          data.tasks,
-        )
-      ) {
-        return false;
-      }
-
-      if (
-        followUpFilter ===
-          'sin-seguimiento' &&
-        ['ganado', 'perdido'].includes(
-          deal.stage,
-        )
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [
-    data.deals,
-    data.companies,
-    data.contacts,
-    data.tasks,
-    search,
-    showClosed,
-    followUpFilter,
-  ]);
+  const today = toDateInput(new Date());
 
   // ============================================
-  // MÉTRICAS
+  // OPORTUNIDADES FILTRADAS
   // ============================================
+
+  const deals = useMemo(
+    () =>
+      filterDeals(
+        data,
+        {
+          search,
+          showClosed,
+          focus,
+        },
+        today,
+      ),
+    [
+      data,
+      search,
+      showClosed,
+      focus,
+      today,
+    ],
+  );
+
+  const counts = useMemo(
+    () => getDealFocusCounts(data, today),
+    [data, today],
+  );
 
   const active = openDeals(data.deals);
 
-  const won = data.deals.filter(
+  const wonCount = data.deals.filter(
     (deal) => deal.stage === 'ganado',
-  );
+  ).length;
 
-  const urgent = active.filter(
-    (deal) =>
-      dealNeedsAttention(
-        deal,
-        data.tasks,
-      ),
-  );
+  // ============================================
+  // DESCRIPCIÓN DEL PRÓXIMO SEGUIMIENTO
+  // ============================================
 
-  const withoutFollowUp = active.filter(
-    (deal) =>
-      !nextPendingTask(
-        deal.id,
-        data.tasks,
-      ),
-  );
+  const describeFollowUp = (deal: Deal) => {
+    const result = getDealFollowUp(
+      deal,
+      data.tasks,
+      today,
+    );
+
+    switch (result.state) {
+      case 'closed':
+        return {
+          title: 'Cerrada',
+          detail: '—',
+        };
+
+      case 'missing':
+        return {
+          title: 'Sin tarea pendiente',
+          detail: 'Programá un seguimiento',
+        };
+
+      case 'undated':
+        return {
+          title: result.task.title,
+          detail: 'Sin fecha',
+        };
+
+      case 'overdue':
+        return {
+          title: result.task.title,
+          detail: `Vencida · ${fmtDate(
+            result.task.dueDate,
+          )}`,
+        };
+
+      case 'today':
+        return {
+          title: result.task.title,
+          detail: 'Para hoy',
+        };
+
+      case 'upcoming':
+        return {
+          title: result.task.title,
+          detail: fmtDate(result.task.dueDate),
+        };
+    }
+  };
 
   // ============================================
   // EXPORTACIÓN CSV
   // ============================================
 
   const exportRows = () => {
-    csvDownload(
-      'nexo-oportunidades.csv',
+    csvDownload('nexo-oportunidades.csv', [
       [
-        [
-          'Oportunidad',
-          'Empresa',
-          'Contacto',
-          'Importe',
-          'Moneda',
-          'Etapa',
-          'Probabilidad',
-          'Responsable',
-          'Cierre estimado',
-          'Próxima acción',
-          'Estado del seguimiento',
-        ],
-
-        ...deals.map((deal) => {
-          const company =
-            data.companies.find(
-              (item) =>
-                item.id === deal.companyId,
-            )?.name ?? '';
-
-          const contact =
-            data.contacts.find(
-              (item) =>
-                item.id === deal.contactId,
-            )?.name ?? '';
-
-          const followUp =
-            getDealFollowUp(
-              deal,
-              data.tasks,
-            );
-
-          return [
-            deal.title,
-            company,
-            contact,
-            deal.amount,
-            data.settings.currency,
-            STAGES.find(
-              (stage) =>
-                stage.id === deal.stage,
-            )?.label ?? deal.stage,
-            deal.probability,
-            deal.owner,
-            deal.dueDate,
-            followUp.label,
-            followUp.detail,
-          ];
-        }),
+        'Oportunidad',
+        'Empresa',
+        'Contacto',
+        'Importe',
+        'Moneda',
+        'Etapa',
+        'Probabilidad',
+        'Responsable',
+        'Cierre estimado',
+        'Próxima tarea',
+        'Estado del seguimiento',
       ],
-    );
 
-    notify('Oportunidades exportadas a CSV');
+      ...deals.map((deal) => {
+        const next = describeFollowUp(deal);
+
+        return [
+          deal.title,
+
+          data.companies.find(
+            (company) =>
+              company.id === deal.companyId,
+          )?.name ?? '',
+
+          data.contacts.find(
+            (contact) =>
+              contact.id === deal.contactId,
+          )?.name ?? '',
+
+          deal.amount,
+          data.settings.currency,
+
+          STAGES.find(
+            (stage) =>
+              stage.id === deal.stage,
+          )?.label ?? deal.stage,
+
+          deal.probability,
+          deal.owner,
+          deal.dueDate,
+
+          next.title,
+          next.detail,
+        ];
+      }),
+    ]);
+
+    notify(
+      'Oportunidades filtradas exportadas a CSV',
+    );
   };
 
   // ============================================
@@ -266,7 +231,7 @@ export function Deals({
       <PageHeading
         eyebrow="VENTAS / OPORTUNIDADES"
         title="Pipeline de ventas"
-        subtitle="Gestioná negociaciones, próximos pasos y seguimientos desde un solo lugar."
+        subtitle="Visualizá cada negociación y mantené el impulso comercial."
         action={
           <button
             type="button"
@@ -280,16 +245,14 @@ export function Deals({
       />
 
       {/* ======================================
-          MÉTRICAS RESUMIDAS
+          INDICADORES
       ====================================== */}
 
       <div className="mini-metrics">
         <div>
           <span>En curso</span>
 
-          <strong>
-            {active.length}
-          </strong>
+          <strong>{active.length}</strong>
         </div>
 
         <div>
@@ -307,39 +270,35 @@ export function Deals({
         <div>
           <span>Ganadas</span>
 
-          <strong>
-            {won.length}
-          </strong>
+          <strong>{wonCount}</strong>
         </div>
 
         <div>
-          <span>Requieren atención</span>
+          <span>Sin próxima tarea</span>
 
           <strong>
-            {urgent.length}
+            {counts.withoutFollowUp}
           </strong>
         </div>
       </div>
 
       {/* ======================================
-          PANEL DEL PIPELINE
+          PIPELINE
       ====================================== */}
 
       <div className="panel full-panel">
-        {/* HERRAMIENTAS */}
+        {/* BARRA DE HERRAMIENTAS */}
 
-        <div className="toolbar commercial-toolbar">
+        <div className="toolbar">
           <div className="search-field">
             <Search size={17} />
 
             <input
               aria-label="Buscar oportunidades"
-              placeholder="Buscar oportunidad, empresa o responsable..."
+              placeholder="Buscar oportunidad, empresa o contacto..."
               value={search}
               onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
+                setSearch(event.target.value)
               }
             />
 
@@ -348,9 +307,7 @@ export function Deals({
                 type="button"
                 title="Limpiar búsqueda"
                 aria-label="Limpiar búsqueda"
-                onClick={() =>
-                  setSearch('')
-                }
+                onClick={() => setSearch('')}
               >
                 ×
               </button>
@@ -358,15 +315,16 @@ export function Deals({
           </div>
 
           <div className="toolbar-right">
-            {/* FILTRO DE SEGUIMIENTO */}
+            {/* FILTROS DE SEGUIMIENTO */}
 
             <select
-              className="select-filter commercial-filter"
+              className="select-filter"
               aria-label="Filtrar por seguimiento"
-              value={followUpFilter}
+              value={focus}
               onChange={(event) =>
-                setFollowUpFilter(
-                  event.target.value as FollowUpFilter,
+                setFocus(
+                  event.target
+                    .value as DealFocusFilter,
                 )
               }
             >
@@ -374,12 +332,24 @@ export function Deals({
                 Todos los seguimientos
               </option>
 
-              <option value="urgentes">
-                Requieren atención
+              <option value="seguimiento-vencido">
+                Tareas vencidas (
+                {counts.overdueFollowUps})
+              </option>
+
+              <option value="seguimiento-hoy">
+                Tareas para hoy (
+                {counts.todayFollowUps})
               </option>
 
               <option value="sin-seguimiento">
-                Sin tareas pendientes
+                Sin próxima tarea (
+                {counts.withoutFollowUp})
+              </option>
+
+              <option value="cierre-vencido">
+                Cierres vencidos (
+                {counts.overdueClosings})
               </option>
             </select>
 
@@ -396,12 +366,10 @@ export function Deals({
                 }
               />
 
-              <span>
-                Mostrar cerradas
-              </span>
+              <span>Mostrar cerradas</span>
             </label>
 
-            {/* CAMBIAR VISTA */}
+            {/* VISTAS */}
 
             <div className="segmented">
               <button
@@ -411,13 +379,13 @@ export function Deals({
                     ? 'active'
                     : ''
                 }
-                onClick={() =>
-                  setView('board')
-                }
                 title="Vista tablero"
                 aria-label="Vista tablero"
                 aria-pressed={
                   view === 'board'
+                }
+                onClick={() =>
+                  setView('board')
                 }
               >
                 <LayoutGrid size={16} />
@@ -430,13 +398,13 @@ export function Deals({
                     ? 'active'
                     : ''
                 }
-                onClick={() =>
-                  setView('table')
-                }
                 title="Vista lista"
                 aria-label="Vista lista"
                 aria-pressed={
                   view === 'table'
+                }
+                onClick={() =>
+                  setView('table')
                 }
               >
                 <List size={16} />
@@ -457,7 +425,7 @@ export function Deals({
         </div>
 
         {/* ====================================
-            VISTA KANBAN
+            VISTA KANBAN ORIGINAL
         ==================================== */}
 
         {view === 'board' ? (
@@ -474,13 +442,6 @@ export function Deals({
                 (deal) =>
                   deal.stage === stage.id,
               );
-
-              const stageAmount =
-                list.reduce(
-                  (total, deal) =>
-                    total + deal.amount,
-                  0,
-                );
 
               return (
                 <div
@@ -510,7 +471,7 @@ export function Deals({
                     }
                   }}
                 >
-                  {/* ENCABEZADO */}
+                  {/* ENCABEZADO ORIGINAL */}
 
                   <div className="column-heading">
                     <div>
@@ -531,89 +492,41 @@ export function Deals({
 
                     <strong>
                       {money(
-                        stageAmount,
+                        list.reduce(
+                          (total, deal) =>
+                            total + deal.amount,
+                          0,
+                        ),
                         data.settings.currency,
                         true,
                       )}
                     </strong>
                   </div>
 
-                  {/* TARJETAS */}
+                  {/* TARJETAS ORIGINALES */}
 
-                  {list.map((deal) => {
-                    const followUp =
-                      getDealFollowUp(
-                        deal,
-                        data.tasks,
-                      );
-
-                    const closingOverdue =
-                      deal.dueDate &&
-                      overdue(deal.dueDate) &&
-                      ![
-                        'ganado',
-                        'perdido',
-                      ].includes(
-                        deal.stage,
-                      );
-
-                    return (
-                      <div
-                        key={deal.id}
-                        className="deal-card-stack"
-                      >
-                        <DealCard
-                          deal={deal}
-                          onClick={() =>
-                            onEdit(deal)
-                          }
-                          onMove={(
-                            newStage,
-                          ) =>
-                            changeStage(
-                              deal.id,
-                              newStage,
-                            )
-                          }
-                        />
-
-                        <div
-                          className={`deal-follow-up follow-up-${followUp.tone}`}
-                        >
-                          <CalendarClock
-                            size={14}
-                          />
-
-                          <div>
-                            <strong>
-                              {followUp.label}
-                            </strong>
-
-                            <small>
-                              {followUp.detail}
-                            </small>
-                          </div>
-                        </div>
-
-                        {closingOverdue && (
-                          <div className="deal-closing-alert">
-                            Cierre estimado vencido
-                            {' · '}
-                            {fmtDate(
-                              deal.dueDate,
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* ESTADO VACÍO */}
+                  {list.map((deal) => (
+                    <DealCard
+                      key={deal.id}
+                      deal={deal}
+                      onClick={() =>
+                        onEdit(deal)
+                      }
+                      onMove={(nextStage) =>
+                        changeStage(
+                          deal.id,
+                          nextStage,
+                        )
+                      }
+                    />
+                  ))}
 
                   {!list.length && (
                     <div className="board-empty">
-                      No hay oportunidades
-                      en esta etapa
+                      {focus === 'todos' &&
+                      !search
+                        ? 'Arrastrá una tarjeta a esta etapa'
+                        : 'Sin coincidencias para este filtro'}
                     </div>
                   )}
                 </div>
@@ -622,7 +535,7 @@ export function Deals({
           </div>
         ) : (
           /* ==================================
-              VISTA TABLA
+              VISTA LISTA
           ================================== */
 
           <div className="table-scroll">
@@ -642,29 +555,15 @@ export function Deals({
 
               <tbody>
                 {deals.map((deal) => {
-                  const company =
-                    data.companies.find(
-                      (item) =>
-                        item.id ===
-                        deal.companyId,
-                    );
-
                   const followUp =
-                    getDealFollowUp(
-                      deal,
-                      data.tasks,
-                    );
+                    describeFollowUp(deal);
 
-                  const closingOverdue =
-                    overdue(
-                      deal.dueDate,
-                    ) &&
+                  const isLate =
                     ![
                       'ganado',
                       'perdido',
-                    ].includes(
-                      deal.stage,
-                    );
+                    ].includes(deal.stage) &&
+                    overdue(deal.dueDate);
 
                   return (
                     <tr
@@ -673,19 +572,18 @@ export function Deals({
                       onClick={() =>
                         onEdit(deal)
                       }
-                      onKeyDown={(
-                        event,
-                      ) => {
+                      onKeyDown={(event) => {
                         if (
-                          event.key ===
-                          'Enter'
+                          event.key === 'Enter' &&
+                          event.target ===
+                            event.currentTarget
                         ) {
-                          onEdit(
-                            deal,
-                          );
+                          onEdit(deal);
                         }
                       }}
                     >
+                      {/* OPORTUNIDAD */}
+
                       <td>
                         <strong>
                           {deal.title}
@@ -696,10 +594,17 @@ export function Deals({
                         </small>
                       </td>
 
+                      {/* EMPRESA */}
+
                       <td>
-                        {company?.name ??
-                          '—'}
+                        {data.companies.find(
+                          (company) =>
+                            company.id ===
+                            deal.companyId,
+                        )?.name ?? '—'}
                       </td>
+
+                      {/* IMPORTE */}
 
                       <td className="money-cell">
                         {money(
@@ -707,6 +612,8 @@ export function Deals({
                           data.settings.currency,
                         )}
                       </td>
+
+                      {/* ETAPA */}
 
                       <td>
                         <StageBadge
@@ -716,27 +623,29 @@ export function Deals({
                         />
                       </td>
 
+                      {/* PROBABILIDAD */}
+
                       <td>
                         {deal.probability}%
                       </td>
 
-                      <td>
-                        <span
-                          className={`table-follow-up follow-up-${followUp.tone}`}
-                        >
-                          <strong>
-                            {followUp.label}
-                          </strong>
+                      {/* PRÓXIMA ACCIÓN */}
 
-                          <small>
-                            {followUp.detail}
-                          </small>
-                        </span>
+                      <td>
+                        <strong>
+                          {followUp.title}
+                        </strong>
+
+                        <small>
+                          {followUp.detail}
+                        </small>
                       </td>
+
+                      {/* CIERRE ESTIMADO */}
 
                       <td
                         className={
-                          closingOverdue
+                          isLate
                             ? 'danger-text'
                             : ''
                         }
@@ -759,57 +668,30 @@ export function Deals({
           </div>
         )}
 
-        {/* ====================================
-            ESTADO VACÍO GENERAL
-        ==================================== */}
+        {/* SIN RESULTADOS */}
 
         {!deals.length && (
-          <div className="commercial-empty">
-            <Empty
-              title="No encontramos oportunidades"
-              detail="Probá otra búsqueda, cambiá los filtros o creá una nueva oportunidad."
-              onAction={onAdd}
-            />
-          </div>
+          <Empty
+            title="No encontramos oportunidades"
+            detail="Probá otra búsqueda, cambiá el filtro o creá una oportunidad."
+            onAction={onAdd}
+          />
         )}
       </div>
 
-      {/* ======================================
-          ACLARACIONES
-      ====================================== */}
+      {/* INSTRUCCIONES */}
 
       <div className="hint-row">
         <SlidersHorizontal size={15} />
 
-        Arrastrá las tarjetas entre
-        columnas o usá el selector
-        de etapa. Cada oportunidad
-        muestra su próxima tarea
-        pendiente.
+        Se muestran {deals.length} de{' '}
+        {data.deals.length} oportunidades.
+        Los filtros no modifican los datos
+        y la exportación CSV respeta los
+        resultados visibles. Arrastrá las
+        tarjetas o utilizá su selector
+        para cambiar de etapa.
       </div>
-
-      {withoutFollowUp.length > 0 && (
-        <div className="commercial-notice">
-          <CalendarClock size={17} />
-
-          <span>
-            <strong>
-              {withoutFollowUp.length}
-              {' '}
-              oportunidad
-              {withoutFollowUp.length !== 1
-                ? 'es'
-                : ''}
-              {' '}
-              sin tareas pendientes.
-            </strong>
-            {' '}
-            Vincular una próxima acción
-            ayuda a evitar seguimientos
-            olvidados.
-          </span>
-        </div>
-      )}
     </>
   );
 }
