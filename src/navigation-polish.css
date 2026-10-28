@@ -1,0 +1,117 @@
+
+/* =========================================================
+   NEXO CRM — Navegación y legibilidad
+   Capa de ajustes: conserva el diseño y las clases originales.
+   Importar desde main.tsx, después de App.
+   ========================================================= */
+
+/* overflow: hidden crea un contenedor de desplazamiento y
+   evita que el encabezado sticky siga el scroll de la página.
+   overflow: clip conserva el recorte visual sin ese efecto. */
+.app-frame {
+  overflow: clip;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: rgba(11, 16, 32, 0.97);
+  box-shadow: 0 8px 24px rgba(2, 7, 22, 0.24);
+}
+
+@supports (backdrop-filter: blur(12px)) {
+  .topbar {
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* Los menús flotantes deben poder desplazarse si la pantalla
+   es baja, sin obligar a desplazar toda la página. */
+.global-search .search-dropdown,
+.topbar .floating-menu {
+  max-height: min(65vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Estados de foco visibles con teclado, sin alterar el hover. */
+.topbar button:focus-visible,
+.topbar input:focus-visible,
+.mobile-nav button:focus-visible,
+.icon-rail button:focus-visible {
+  outline: 2px solid #a3c0ff;
+  outline-offset: 3px;
+}
+
+/* Dar suficiente contraste a los textos informativos secundarios. */
+.page-heading p {
+  color: #aabbd9;
+  font-size: 13px;
+}
+
+.section-title-text small {
+  color: #a5b7d5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.metric-card small,
+.form-field small {
+  color: #a5b8d8;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.panel-footnote {
+  color: #9eb0d1;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 5px;
+}
+
+/* Navegación adaptable: el menú se mantiene bajo la barra. */
+@media (max-width: 1180px) {
+  .mobile-nav {
+    position: sticky;
+    top: 84px;
+    z-index: 79;
+    max-height: min(65vh, 480px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-shadow: 0 14px 28px rgba(1, 6, 21, 0.32);
+  }
+
+  .mobile-nav .nav-link {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 850px) {
+  .mobile-nav {
+    top: 70px;
+  }
+}
+
+@media (max-width: 560px) {
+  .mobile-nav {
+    top: 64px;
+    padding: 10px;
+    gap: 5px;
+  }
+
+  .mobile-nav .nav-link {
+    min-height: 44px;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .global-search .search-dropdown {
+    max-width: calc(100vw - 20px);
+    max-height: min(58vh, 360px);
+  }
+
+  .page-heading p {
+    font-size: 12px;
+  }
+}
