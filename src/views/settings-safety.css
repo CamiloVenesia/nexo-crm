@@ -1,0 +1,234 @@
+
+/* ============================================
+   NEXO CRM — CONFIGURACIÓN Y RESPALDOS
+   Solo afecta a la pantalla Settings.
+============================================ */
+
+.settings-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.settings-buttons .btn:disabled,
+.setting-action .btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+/* CAMBIOS SIN GUARDAR */
+
+.settings-unsaved {
+  margin: 0;
+  padding: 9px 12px;
+
+  border: 1px solid rgba(138, 174, 247, 0.3);
+  border-radius: 8px;
+
+  background: rgba(52, 91, 157, 0.13);
+  color: #b5d1ff;
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* RESUMEN DE DATOS */
+
+.settings-data-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.settings-data-summary span {
+  padding: 6px 9px;
+
+  border: 1px solid #304367;
+  border-radius: 7px;
+
+  background: rgba(33, 53, 99, 0.27);
+  color: #9fb3d4;
+
+  font-size: 11px;
+}
+
+.settings-data-summary strong {
+  color: #e6efff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* VISTA PREVIA Y REINICIO */
+
+.settings-backup-preview,
+.settings-reset-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+
+  padding: 15px;
+
+  border: 1px solid #46669d;
+  border-radius: 11px;
+
+  background: rgba(23, 42, 79, 0.65);
+}
+
+.settings-preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-preview-heading strong,
+.settings-reset-confirm > strong {
+  color: #eff4ff;
+  font-size: 13px;
+}
+
+.settings-preview-heading p {
+  margin: 5px 0 0;
+
+  color: #a4b9dc;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.settings-small-close {
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+
+  border: 1px solid #3e5887;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #a9c0e5;
+
+  cursor: pointer;
+}
+
+/* COMPARACIÓN DE RESPALDOS */
+
+.settings-preview-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-preview-comparison > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  min-width: 0;
+  padding: 12px;
+
+  border: 1px solid #304a77;
+  border-radius: 9px;
+
+  background: rgba(12, 27, 57, 0.64);
+}
+
+.settings-preview-comparison small {
+  color: #86a7dc;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.settings-preview-comparison strong {
+  color: #ebf2ff;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.settings-preview-comparison span {
+  color: #a4b7d5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ADVERTENCIA */
+
+.settings-preview-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+
+  margin: 0;
+
+  color: #ffbeaa;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.settings-preview-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* CONFIRMACIÓN DE REINICIO */
+
+.settings-reset-confirm {
+  border-color: rgba(237, 120, 139, 0.4);
+  background: rgba(88, 36, 55, 0.16);
+}
+
+.settings-reset-confirm p {
+  margin: 0;
+
+  color: #c5b5c2;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.settings-reset-confirm p strong {
+  color: #f6d7db;
+}
+
+.settings-reset-confirm label {
+  color: #e7d6e1;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.settings-reset-confirm input {
+  width: min(100%, 300px);
+  padding: 10px 12px;
+
+  border: 1px solid #77516c;
+  border-radius: 9px;
+
+  outline: none;
+  background: #14203a;
+  color: #f2f5ff;
+
+  font: inherit;
+}
+
+/* ACCESIBILIDAD */
+
+.settings-reset-confirm input:focus-visible,
+.settings-small-close:focus-visible,
+.settings-buttons button:focus-visible {
+  outline: 2px solid #99bbff;
+  outline-offset: 2px;
+}
+
+/* CELULARES */
+
+@media (max-width: 600px) {
+  .settings-preview-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-buttons .btn {
+    justify-content: center;
+  }
+}
