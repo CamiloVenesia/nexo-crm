@@ -1,0 +1,119 @@
+
+/* NEXO CRM — Filtros de tareas. No modifica las demás pantallas. */
+
+.tasks-toolbar-right {
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.tasks-priority-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #91add6;
+}
+
+.tasks-priority-select .select-filter {
+  max-width: 190px;
+}
+
+.tasks-date-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 17px;
+  border-bottom: 1px solid #2a3657;
+}
+
+.tasks-filter-label {
+  margin-right: 5px;
+  color: #8297b9;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.tasks-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #304469;
+  border-radius: 8px;
+  background: #182843;
+  color: #aabbda;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tasks-filter-button span {
+  color: #8ea9d4;
+  font-variant-numeric: tabular-nums;
+}
+
+.tasks-filter-button:hover {
+  border-color: #5477b4;
+  color: #edf3ff;
+}
+
+.tasks-filter-button.active {
+  border-color: #5686dc;
+  background: #254579;
+  color: #f3f6ff;
+}
+
+.tasks-filter-button.active span {
+  color: #e4efff;
+}
+
+.tasks-filter-button.urgent:not(.active) span {
+  color: #ff9eaa;
+}
+
+.task-row.tasks-row-late {
+  box-shadow: inset 3px 0 #dd6e84;
+}
+
+.task-body .tasks-related-deal {
+  margin-top: 6px;
+  color: #8facd6;
+}
+
+.tasks-filter-button:focus-visible,
+.tasks-priority-select select:focus-visible {
+  outline: 2px solid #91b8ff;
+  outline-offset: 2px;
+}
+
+.tasks-hint {
+  line-height: 1.6;
+}
+
+@media (max-width: 850px) {
+  .tasks-toolbar-right {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .tasks-date-filters {
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .tasks-filter-label {
+    width: 100%;
+  }
+
+  .tasks-priority-select {
+    width: 100%;
+  }
+
+  .tasks-priority-select .select-filter {
+    flex: 1;
+    max-width: none;
+  }
+}
