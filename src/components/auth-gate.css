@@ -1,0 +1,219 @@
+
+/* NEXO CRM — Pantalla de acceso */
+
+.nexo-auth-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at 15% 10%, #283b7d, transparent 42%),
+    radial-gradient(ellipse at 87% 80%, #342764, transparent 40%),
+    #0d1428;
+  color: #edf2ff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.nexo-auth-card {
+  width: min(100%, 430px);
+  padding: 34px;
+  border: 1px solid #3b4d78;
+  border-radius: 20px;
+  background: linear-gradient(155deg, #1c2b4d, #121d38);
+  box-shadow: 0 25px 70px #05091695;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.nexo-auth-symbol {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(130deg, #5386f7, #8e5ad7);
+  border-radius: 12px;
+  font-size: 26px;
+  font-weight: 900;
+  color: white;
+}
+
+.nexo-auth-eyebrow {
+  color: #97b9fa;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.nexo-auth-feature-icon {
+  color: #9eb8f9;
+  margin-top: 6px;
+}
+
+.nexo-auth-card h1 {
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -0.6px;
+  margin: 0;
+  color: #f3f6ff;
+}
+
+.nexo-auth-card p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #b4c5e4;
+  margin: 0;
+}
+
+.nexo-auth-card form {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.nexo-auth-card label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #d3e0f5;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.nexo-auth-card input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 44px;
+  border-radius: 9px;
+  background: #111b35;
+  border: 1px solid #42547b;
+  padding: 0 13px;
+  font-size: 13px;
+  color: #eff5ff;
+  outline: none;
+}
+
+.nexo-auth-card input:focus {
+  border-color: #8fb4ff;
+  box-shadow: 0 0 0 3px #6087da33;
+}
+
+.nexo-auth-card input::placeholder {
+  color: #8ca1c3;
+}
+
+.nexo-auth-submit {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin-top: 7px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(90deg, #4b80f8, #7263e8);
+  color: white;
+  font-weight: 750;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.nexo-auth-submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.nexo-auth-link,
+.nexo-auth-links button {
+  background: none;
+  border: 0;
+  color: #a8c4ff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+}
+
+.nexo-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nexo-auth-card .nexo-auth-error {
+  padding: 10px;
+  border-radius: 8px;
+  color: #ffd6de;
+  background: #a5223c24;
+  border: 1px solid #ce577288;
+}
+
+.nexo-auth-card .nexo-auth-success {
+  padding: 10px;
+  border-radius: 8px;
+  color: #c1ffe9;
+  background: #288e6a24;
+  border: 1px solid #398b7188;
+}
+
+.nexo-auth-footnote {
+  border-top: 1px solid #33456b;
+  padding-top: 15px;
+  margin-top: 7px;
+  color: #94a9cc;
+  font-size: 10px;
+}
+
+.nexo-session-chip {
+  position: fixed;
+  right: 14px;
+  bottom: 15px;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: min(520px, calc(100vw - 28px));
+  padding: 8px 11px;
+  border: 1px solid #526797;
+  border-radius: 10px;
+  background: #182849f2;
+  box-shadow: 0 8px 30px #03071588;
+  color: #b8cdec;
+  font: 11px Inter, system-ui, sans-serif;
+}
+
+.nexo-session-chip > span {
+  overflow-wrap: anywhere;
+}
+
+.nexo-session-chip button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid #566d9b;
+  border-radius: 7px;
+  background: #243b65;
+  color: #f1f5ff;
+  cursor: pointer;
+}
+
+.nexo-auth-page button:focus-visible,
+.nexo-session-chip button:focus-visible {
+  outline: 2px solid #a4c3ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .nexo-auth-card {
+    padding: 22px;
+  }
+
+  .nexo-session-chip {
+    left: 14px;
+    right: 14px;
+    font-size: 10px;
+  }
+}
