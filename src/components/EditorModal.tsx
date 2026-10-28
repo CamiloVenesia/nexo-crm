@@ -1,21 +1,11 @@
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
-
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
-import {
-  Check,
-  Info,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Check, Info, Trash2, X } from 'lucide-react';
 
 import { useCRM } from '../lib/store';
+import { ConfirmDialog } from './ConfirmDialog';
 
 import {
   blankCompany,
@@ -25,27 +15,11 @@ import {
   createId,
 } from '../lib/seed';
 
-import type {
-  Company,
-  Contact,
-  Deal,
-  Stage,
-  Task,
-} from '../types';
-
+import type { Company, Contact, Deal, Stage, Task } from '../types';
 import { STAGES } from '../types';
 
-import {
-  validateEditor,
-} from '../lib/editorValidation';
-
-import type {
-  EditorEntity,
-} from '../lib/editorValidation';
-
-// ==================================================
-// TIPOS
-// ==================================================
+import { validateEditor } from '../lib/editorValidation';
+import type { EditorEntity } from '../lib/editorValidation';
 
 export type Editing =
   | { kind: 'deal'; value?: Deal }
@@ -58,6 +32,11 @@ interface EditorModalProps {
   onClose: () => void;
 }
 
+type Confirmation =
+  | { kind: 'discard' }
+  | { kind: 'delete'; consequence: string }
+  | null;
+
 const labels = {
   deal: 'oportunidad',
   contact: 'contacto',
@@ -65,14 +44,8 @@ const labels = {
   task: 'tarea',
 };
 
-// ==================================================
-// FORMULARIO INICIAL
-// ==================================================
-
 function createInitialForm(editing: Editing): EditorEntity {
-  if (editing.value) {
-    return { ...editing.value };
-  }
+  if (editing.value) return { ...editing.value };
 
   const now = new Date().toISOString();
   const id = createId();
@@ -109,10 +82,6 @@ function createInitialForm(editing: Editing): EditorEntity {
   }
 }
 
-// ==================================================
-// COMPONENTE
-// ==================================================
-
 export function EditorModal({
   editing,
   onClose,
@@ -127,119 +96,87 @@ export function EditorModal({
     () => createInitialForm(editing),
   );
 
-  const originalRef = useRef(
-    JSON.stringify(form),
-  );
-
+  const originalRef = useRef(JSON.stringify(form));
   const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState<Confirmation>(null);
 
-  const isDirty =
-    JSON.stringify(form) !== originalRef.current;
+  const isDirty = JSON.stringify(form) !== originalRef.current;
 
-  // ==================================================
-  // ACTUALIZAR CAMPOS
-  // ==================================================
-
-  const setField = (
-    key: string,
-    value: unknown,
-  ) => {
+  const setField = (key: string, value: unknown) => {
     setError('');
-
     setForm((current) => ({
       ...current,
       [key]: value,
     }));
   };
 
-  // ==================================================
-  // CERRAR SIN PERDER DATOS
-  // ==================================================
-
+  // Cerrar nunca descarta cambios sin confirmación.
   const requestClose = useCallback(() => {
-    if (
-      isDirty &&
-      !window.confirm(
-        'Tenés cambios sin guardar. ¿Querés descartarlos y cerrar el formulario?',
-      )
-    ) {
+    if (confirmation) return;
+
+    if (isDirty) {
+      setConfirmation({ kind: 'discard' });
       return;
     }
 
     onClose();
-  }, [isDirty, onClose]);
+  }, [confirmation, isDirty, onClose]);
 
   useEffect(() => {
-    const handleKeyDown = (
-      event: KeyboardEvent,
-    ) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // El diálogo nativo gestiona su propio Escape y foco.
+      if (confirmation) return;
+
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-
         requestClose();
         return;
       }
 
-      // Mantiene el foco dentro del modal.
-      if (event.key === 'Tab') {
-        const modal = modalRef.current;
+      if (event.key !== 'Tab') return;
 
-        if (!modal) return;
+      const modal = modalRef.current;
+      if (!modal) return;
 
-        const elements = Array.from(
-          modal.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])',
-          ),
-        ).filter(
-          (element) =>
-            element.getClientRects().length > 0,
-        );
+      const elements = Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
 
-        if (!elements.length) return;
+      if (!elements.length) return;
 
-        const first = elements[0];
-        const last = elements[elements.length - 1];
+      const first = elements[0];
+      const last = elements[elements.length - 1];
 
-        if (
-          event.shiftKey &&
-          document.activeElement === first
-        ) {
-          event.preventDefault();
-          last.focus();
-        } else if (
-          !event.shiftKey &&
-          document.activeElement === last
-        ) {
-          event.preventDefault();
-          first.focus();
-        }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        document.activeElement === last
+      ) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
-    window.addEventListener(
-      'keydown',
-      handleKeyDown,
-      true,
-    );
+    window.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
-      window.removeEventListener(
-        'keydown',
-        handleKeyDown,
-        true,
-      );
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [requestClose]);
+  }, [requestClose, confirmation]);
 
-  // ==================================================
+  // ============================================
   // GUARDAR
-  // ==================================================
+  // ============================================
 
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (submittingRef.current) return;
+    if (submittingRef.current || confirmation) return;
 
     setError('');
 
@@ -321,28 +258,20 @@ export function EditorModal({
     }
   };
 
-  // ==================================================
-  // ELIMINAR
-  // ==================================================
+  // ============================================
+  // PREPARAR ELIMINACIÓN
+  // ============================================
 
   const remove = () => {
-    if (!editing.value) return;
+    if (!editing.value || confirmation) return;
 
     const id = editing.value.id;
 
     const exists = {
-      deal: data.deals.some(
-        (item) => item.id === id,
-      ),
-      contact: data.contacts.some(
-        (item) => item.id === id,
-      ),
-      company: data.companies.some(
-        (item) => item.id === id,
-      ),
-      task: data.tasks.some(
-        (item) => item.id === id,
-      ),
+      deal: data.deals.some((item) => item.id === id),
+      contact: data.contacts.some((item) => item.id === id),
+      company: data.companies.some((item) => item.id === id),
+      task: data.tasks.some((item) => item.id === id),
     }[editing.kind];
 
     if (!exists) {
@@ -352,25 +281,25 @@ export function EditorModal({
       return;
     }
 
+    // Conservamos la protección de empresas vinculadas.
     if (editing.kind === 'company') {
-      const linkedContacts = data.contacts.filter(
+      const contacts = data.contacts.filter(
         (item) => item.companyId === id,
       ).length;
 
-      const linkedDeals = data.deals.filter(
+      const deals = data.deals.filter(
         (item) => item.companyId === id,
       ).length;
 
-      if (linkedContacts || linkedDeals) {
+      if (contacts || deals) {
         setError(
-          `No se puede eliminar esta empresa: tiene ${linkedContacts} contacto(s) y ${linkedDeals} oportunidad(es) asociados. Desvinculalos primero.`,
+          `No se puede eliminar esta empresa: tiene ${contacts} contacto(s) y ${deals} oportunidad(es) asociados. Desvinculalos primero.`,
         );
         return;
       }
     }
 
-    let consequence =
-      'Esta acción no se puede deshacer.';
+    let consequence = 'Esta acción no se puede deshacer.';
 
     if (editing.kind === 'deal') {
       const count = data.tasks.filter(
@@ -394,11 +323,31 @@ export function EditorModal({
       }
     }
 
-    const confirmed = window.confirm(
-      `¿Eliminar esta ${labels[editing.kind]}?\n\n${consequence}`,
-    );
+    // No eliminamos hasta que el usuario confirme.
+    setConfirmation({
+      kind: 'delete',
+      consequence,
+    });
+  };
 
-    if (!confirmed) return;
+  // ============================================
+  // CONFIRMAR ACCIÓN
+  // ============================================
+
+  const confirmAction = () => {
+    if (!confirmation) return;
+
+    if (confirmation.kind === 'discard') {
+      onClose();
+      return;
+    }
+
+    if (!editing.value) {
+      setConfirmation(null);
+      return;
+    }
+
+    const id = editing.value.id;
 
     switch (editing.kind) {
       case 'deal':
@@ -421,17 +370,11 @@ export function EditorModal({
     onClose();
   };
 
-  // ==================================================
-  // INTERFAZ
-  // ==================================================
-
   return (
     <div
       className="modal-backdrop"
       onMouseDown={(event) => {
-        if (
-          event.target === event.currentTarget
-        ) {
+        if (event.target === event.currentTarget) {
           requestClose();
         }
       }}
@@ -471,13 +414,10 @@ export function EditorModal({
           </button>
         </header>
 
-        <form
-          onSubmit={save}
-          className="modal-form"
-        >
-          {/* ========================================
+        <form onSubmit={save} className="modal-form">
+          {/* ====================================
               OPORTUNIDAD
-          ======================================== */}
+          ==================================== */}
 
           {editing.kind === 'deal' && (
             <>
@@ -500,9 +440,7 @@ export function EditorModal({
               </div>
 
               <div className="form-field">
-                <label htmlFor="deal-company">
-                  Empresa
-                </label>
+                <label htmlFor="deal-company">Empresa</label>
 
                 <select
                   id="deal-company"
@@ -517,15 +455,10 @@ export function EditorModal({
                     }));
                   }}
                 >
-                  <option value="">
-                    Sin empresa
-                  </option>
+                  <option value="">Sin empresa</option>
 
                   {data.companies.map((company) => (
-                    <option
-                      key={company.id}
-                      value={company.id}
-                    >
+                    <option key={company.id} value={company.id}>
                       {company.name}
                     </option>
                   ))}
@@ -533,36 +466,25 @@ export function EditorModal({
               </div>
 
               <div className="form-field">
-                <label htmlFor="deal-contact">
-                  Contacto
-                </label>
+                <label htmlFor="deal-contact">Contacto</label>
 
                 <select
                   id="deal-contact"
                   value={(form as Deal).contactId}
                   onChange={(event) =>
-                    setField(
-                      'contactId',
-                      event.target.value,
-                    )
+                    setField('contactId', event.target.value)
                   }
                 >
-                  <option value="">
-                    Sin contacto
-                  </option>
+                  <option value="">Sin contacto</option>
 
                   {data.contacts
                     .filter(
                       (contact) =>
                         !(form as Deal).companyId ||
-                        contact.companyId ===
-                          (form as Deal).companyId,
+                        contact.companyId === (form as Deal).companyId,
                     )
                     .map((contact) => (
-                      <option
-                        key={contact.id}
-                        value={contact.id}
-                      >
+                      <option key={contact.id} value={contact.id}>
                         {contact.name}
                       </option>
                     ))}
@@ -578,29 +500,23 @@ export function EditorModal({
                   id="deal-amount"
                   type="number"
                   min={0}
-                  step="1"
+                  step="0.01"
                   required
                   value={(form as Deal).amount}
                   onChange={(event) =>
-                    setField(
-                      'amount',
-                      Number(event.target.value),
-                    )
+                    setField('amount', Number(event.target.value))
                   }
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="deal-stage">
-                  Etapa
-                </label>
+                <label htmlFor="deal-stage">Etapa</label>
 
                 <select
                   id="deal-stage"
                   value={(form as Deal).stage}
                   onChange={(event) => {
-                    const stage = event.target
-                      .value as Stage;
+                    const stage = event.target.value as Stage;
 
                     setError('');
 
@@ -608,18 +524,13 @@ export function EditorModal({
                       ...current,
                       stage,
                       probability:
-                        STAGES.find(
-                          (item) =>
-                            item.id === stage,
-                        )?.probability ?? 15,
+                        STAGES.find((item) => item.id === stage)
+                          ?.probability ?? 15,
                     }));
                   }}
                 >
                   {STAGES.map((stage) => (
-                    <option
-                      key={stage.id}
-                      value={stage.id}
-                    >
+                    <option key={stage.id} value={stage.id}>
                       {stage.label}
                     </option>
                   ))}
@@ -639,10 +550,7 @@ export function EditorModal({
                   required
                   value={(form as Deal).probability}
                   onChange={(event) =>
-                    setField(
-                      'probability',
-                      Number(event.target.value),
-                    )
+                    setField('probability', Number(event.target.value))
                   }
                 />
               </div>
@@ -657,18 +565,13 @@ export function EditorModal({
                   type="date"
                   value={(form as Deal).dueDate}
                   onChange={(event) =>
-                    setField(
-                      'dueDate',
-                      event.target.value,
-                    )
+                    setField('dueDate', event.target.value)
                   }
                 />
               </div>
 
               <div className="form-field full">
-                <label htmlFor="deal-owner">
-                  Responsable *
-                </label>
+                <label htmlFor="deal-owner">Responsable *</label>
 
                 <input
                   id="deal-owner"
@@ -676,10 +579,7 @@ export function EditorModal({
                   maxLength={90}
                   value={(form as Deal).owner}
                   onChange={(event) =>
-                    setField(
-                      'owner',
-                      event.target.value,
-                    )
+                    setField('owner', event.target.value)
                   }
                 />
               </div>
@@ -695,10 +595,7 @@ export function EditorModal({
                   maxLength={2500}
                   value={(form as Deal).notes}
                   onChange={(event) =>
-                    setField(
-                      'notes',
-                      event.target.value,
-                    )
+                    setField('notes', event.target.value)
                   }
                   placeholder="Contexto, objeciones, próximos pasos…"
                 />
@@ -706,9 +603,9 @@ export function EditorModal({
             </>
           )}
 
-          {/* ========================================
+          {/* ====================================
               CONTACTO
-          ======================================== */}
+          ==================================== */}
 
           {editing.kind === 'contact' && (
             <>
@@ -724,10 +621,7 @@ export function EditorModal({
                   maxLength={100}
                   value={(form as Contact).name}
                   onChange={(event) =>
-                    setField(
-                      'name',
-                      event.target.value,
-                    )
+                    setField('name', event.target.value)
                   }
                   placeholder="Ej. Ana López"
                 />
@@ -743,58 +637,40 @@ export function EditorModal({
                   type="email"
                   value={(form as Contact).email}
                   onChange={(event) =>
-                    setField(
-                      'email',
-                      event.target.value,
-                    )
+                    setField('email', event.target.value)
                   }
                   placeholder="ana@empresa.com"
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="contact-phone">
-                  Teléfono
-                </label>
+                <label htmlFor="contact-phone">Teléfono</label>
 
                 <input
                   id="contact-phone"
                   type="tel"
                   value={(form as Contact).phone}
                   onChange={(event) =>
-                    setField(
-                      'phone',
-                      event.target.value,
-                    )
+                    setField('phone', event.target.value)
                   }
                   placeholder="+54 341 ..."
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="contact-company">
-                  Empresa
-                </label>
+                <label htmlFor="contact-company">Empresa</label>
 
                 <select
                   id="contact-company"
                   value={(form as Contact).companyId}
                   onChange={(event) =>
-                    setField(
-                      'companyId',
-                      event.target.value,
-                    )
+                    setField('companyId', event.target.value)
                   }
                 >
-                  <option value="">
-                    Sin empresa
-                  </option>
+                  <option value="">Sin empresa</option>
 
                   {data.companies.map((company) => (
-                    <option
-                      key={company.id}
-                      value={company.id}
-                    >
+                    <option key={company.id} value={company.id}>
                       {company.name}
                     </option>
                   ))}
@@ -802,65 +678,42 @@ export function EditorModal({
               </div>
 
               <div className="form-field">
-                <label htmlFor="contact-role">
-                  Cargo
-                </label>
+                <label htmlFor="contact-role">Cargo</label>
 
                 <input
                   id="contact-role"
                   value={(form as Contact).role}
                   onChange={(event) =>
-                    setField(
-                      'role',
-                      event.target.value,
-                    )
+                    setField('role', event.target.value)
                   }
                   placeholder="Ej. Gerente de ventas"
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="contact-status">
-                  Estado
-                </label>
+                <label htmlFor="contact-status">Estado</label>
 
                 <select
                   id="contact-status"
                   value={(form as Contact).status}
                   onChange={(event) =>
-                    setField(
-                      'status',
-                      event.target.value,
-                    )
+                    setField('status', event.target.value)
                   }
                 >
-                  <option value="nuevo">
-                    Nuevo
-                  </option>
-
-                  <option value="contactado">
-                    Contactado
-                  </option>
-
-                  <option value="calificado">
-                    Calificado
-                  </option>
+                  <option value="nuevo">Nuevo</option>
+                  <option value="contactado">Contactado</option>
+                  <option value="calificado">Calificado</option>
                 </select>
               </div>
 
               <div className="form-field">
-                <label htmlFor="contact-source">
-                  Origen
-                </label>
+                <label htmlFor="contact-source">Origen</label>
 
                 <select
                   id="contact-source"
                   value={(form as Contact).source}
                   onChange={(event) =>
-                    setField(
-                      'source',
-                      event.target.value,
-                    )
+                    setField('source', event.target.value)
                   }
                 >
                   {[
@@ -872,36 +725,29 @@ export function EditorModal({
                     'Evento',
                     'Otro',
                   ].map((source) => (
-                    <option key={source}>
-                      {source}
-                    </option>
+                    <option key={source}>{source}</option>
                   ))}
                 </select>
               </div>
 
               <div className="form-field full">
-                <label htmlFor="contact-notes">
-                  Notas
-                </label>
+                <label htmlFor="contact-notes">Notas</label>
 
                 <textarea
                   id="contact-notes"
                   rows={4}
                   value={(form as Contact).notes}
                   onChange={(event) =>
-                    setField(
-                      'notes',
-                      event.target.value,
-                    )
+                    setField('notes', event.target.value)
                   }
                 />
               </div>
             </>
           )}
 
-          {/* ========================================
+          {/* ====================================
               EMPRESA
-          ======================================== */}
+          ==================================== */}
 
           {editing.kind === 'company' && (
             <>
@@ -917,28 +763,20 @@ export function EditorModal({
                   maxLength={110}
                   value={(form as Company).name}
                   onChange={(event) =>
-                    setField(
-                      'name',
-                      event.target.value,
-                    )
+                    setField('name', event.target.value)
                   }
                   placeholder="Ej. Estudio Norte"
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="company-industry">
-                  Industria
-                </label>
+                <label htmlFor="company-industry">Industria</label>
 
                 <input
                   id="company-industry"
                   value={(form as Company).industry}
                   onChange={(event) =>
-                    setField(
-                      'industry',
-                      event.target.value,
-                    )
+                    setField('industry', event.target.value)
                   }
                   placeholder="Tecnología, comercio…"
                 />
@@ -953,10 +791,7 @@ export function EditorModal({
                   id="company-size"
                   value={(form as Company).employees}
                   onChange={(event) =>
-                    setField(
-                      'employees',
-                      event.target.value,
-                    )
+                    setField('employees', event.target.value)
                   }
                 >
                   {[
@@ -966,44 +801,32 @@ export function EditorModal({
                     '201-500',
                     '500+',
                   ].map((size) => (
-                    <option key={size}>
-                      {size}
-                    </option>
+                    <option key={size}>{size}</option>
                   ))}
                 </select>
               </div>
 
               <div className="form-field">
-                <label htmlFor="company-location">
-                  Ubicación
-                </label>
+                <label htmlFor="company-location">Ubicación</label>
 
                 <input
                   id="company-location"
                   value={(form as Company).location}
                   onChange={(event) =>
-                    setField(
-                      'location',
-                      event.target.value,
-                    )
+                    setField('location', event.target.value)
                   }
                   placeholder="Rosario, Argentina"
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="company-website">
-                  Sitio web
-                </label>
+                <label htmlFor="company-website">Sitio web</label>
 
                 <input
                   id="company-website"
                   value={(form as Company).website}
                   onChange={(event) =>
-                    setField(
-                      'website',
-                      event.target.value,
-                    )
+                    setField('website', event.target.value)
                   }
                   placeholder="ejemplo.com"
                 />
@@ -1011,9 +834,9 @@ export function EditorModal({
             </>
           )}
 
-          {/* ========================================
+          {/* ====================================
               TAREA
-          ======================================== */}
+          ==================================== */}
 
           {editing.kind === 'task' && (
             <>
@@ -1029,10 +852,7 @@ export function EditorModal({
                   maxLength={150}
                   value={(form as Task).title}
                   onChange={(event) =>
-                    setField(
-                      'title',
-                      event.target.value,
-                    )
+                    setField('title', event.target.value)
                   }
                   placeholder="Ej. Llamar al cliente"
                 />
@@ -1049,40 +869,24 @@ export function EditorModal({
                   required
                   value={(form as Task).dueDate}
                   onChange={(event) =>
-                    setField(
-                      'dueDate',
-                      event.target.value,
-                    )
+                    setField('dueDate', event.target.value)
                   }
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="task-priority">
-                  Prioridad
-                </label>
+                <label htmlFor="task-priority">Prioridad</label>
 
                 <select
                   id="task-priority"
                   value={(form as Task).priority}
                   onChange={(event) =>
-                    setField(
-                      'priority',
-                      event.target.value,
-                    )
+                    setField('priority', event.target.value)
                   }
                 >
-                  <option value="alta">
-                    Alta
-                  </option>
-
-                  <option value="media">
-                    Media
-                  </option>
-
-                  <option value="baja">
-                    Baja
-                  </option>
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baja">Baja</option>
                 </select>
               </div>
 
@@ -1095,21 +899,13 @@ export function EditorModal({
                   id="task-deal"
                   value={(form as Task).dealId}
                   onChange={(event) =>
-                    setField(
-                      'dealId',
-                      event.target.value,
-                    )
+                    setField('dealId', event.target.value)
                   }
                 >
-                  <option value="">
-                    Sin vincular
-                  </option>
+                  <option value="">Sin vincular</option>
 
                   {data.deals.map((deal) => (
-                    <option
-                      key={deal.id}
-                      value={deal.id}
-                    >
+                    <option key={deal.id} value={deal.id}>
                       {deal.title}
                     </option>
                   ))}
@@ -1126,10 +922,7 @@ export function EditorModal({
                   rows={4}
                   value={(form as Task).description}
                   onChange={(event) =>
-                    setField(
-                      'description',
-                      event.target.value,
-                    )
+                    setField('description', event.target.value)
                   }
                 />
               </div>
@@ -1140,28 +933,21 @@ export function EditorModal({
                     type="checkbox"
                     checked={(form as Task).done}
                     onChange={(event) =>
-                      setField(
-                        'done',
-                        event.target.checked,
-                      )
+                      setField('done', event.target.checked)
                     }
                   />
-
                   Marcar como completada
                 </label>
               </div>
             </>
           )}
 
-          {/* ========================================
+          {/* ====================================
               ERRORES Y ACCIONES
-          ======================================== */}
+          ==================================== */}
 
           {error && (
-            <div
-              className="form-error"
-              role="alert"
-            >
+            <div className="form-error" role="alert">
               <Info size={15} />
               {error}
             </div>
@@ -1189,16 +975,40 @@ export function EditorModal({
               Cancelar
             </button>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-            >
+            <button type="submit" className="btn btn-primary">
               <Check size={16} />
               Guardar {labels[editing.kind]}
             </button>
           </footer>
         </form>
       </section>
+
+      {confirmation && (
+        <ConfirmDialog
+          tone={
+            confirmation.kind === 'delete'
+              ? 'danger'
+              : 'warning'
+          }
+          title={
+            confirmation.kind === 'delete'
+              ? `¿Eliminar esta ${labels[editing.kind]}?`
+              : '¿Descartar los cambios?'
+          }
+          description={
+            confirmation.kind === 'delete'
+              ? confirmation.consequence
+              : 'Tenés cambios sin guardar. Si cerrás ahora, se perderán las modificaciones de este formulario.'
+          }
+          confirmLabel={
+            confirmation.kind === 'delete'
+              ? `Eliminar ${labels[editing.kind]}`
+              : 'Descartar cambios'
+          }
+          onConfirm={confirmAction}
+          onCancel={() => setConfirmation(null)}
+        />
+      )}
     </div>
   );
 }

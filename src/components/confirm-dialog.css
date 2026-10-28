@@ -1,0 +1,109 @@
+
+/* NEXO CRM — Confirmación integrada al tema actual. */
+
+.nexo-confirm {
+  position: fixed;
+  inset: 0;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow-y: auto;
+  border: 1px solid #43577e;
+  border-radius: 16px;
+  background: #17233d;
+  color: #eaf1ff;
+  box-shadow: 0 24px 80px #010614c9;
+}
+
+.nexo-confirm::backdrop {
+  background: rgba(4, 9, 23, 0.76);
+  backdrop-filter: blur(6px);
+}
+
+.nexo-confirm__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.nexo-confirm__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 11px;
+  color: #ffb7bd;
+  background: rgba(218, 86, 115, 0.14);
+  border: 1px solid rgba(233, 111, 135, 0.28);
+}
+
+.nexo-confirm--warning .nexo-confirm__icon {
+  color: #ffd2a8;
+  background: rgba(231, 161, 82, 0.13);
+  border-color: rgba(231, 161, 82, 0.3);
+}
+
+.nexo-confirm__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #405578;
+  border-radius: 9px;
+  background: #202f4c;
+  color: #adbfdf;
+  cursor: pointer;
+}
+
+.nexo-confirm h2 {
+  margin: 0 0 9px;
+  color: #f0f5ff;
+  font-size: 19px;
+  line-height: 1.35;
+  letter-spacing: -0.35px;
+}
+
+.nexo-confirm p {
+  margin: 0 0 24px;
+  color: #b8c7e2;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.nexo-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.nexo-confirm button:focus-visible {
+  outline: 2px solid #a5c6ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  .nexo-confirm {
+    padding: 19px;
+  }
+
+  .nexo-confirm__actions {
+    flex-direction: column-reverse;
+  }
+
+  .nexo-confirm__actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexo-confirm::backdrop {
+    backdrop-filter: none;
+  }
+}
