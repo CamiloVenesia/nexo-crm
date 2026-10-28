@@ -1,0 +1,652 @@
+
+/* NEXO CRM — Calendario y Mensajería.
+   Conserva los estilos y colores originales. */
+
+.nexo-extras {
+  display: grid;
+  gap: 19px;
+  min-width: 0;
+}
+
+.nexo-extras .page-heading {
+  margin-bottom: 0;
+}
+
+/* CALENDARIO */
+
+.nexo-cal-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.nexo-cal-summary > div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 15px 18px;
+  border: 1px solid #324368;
+  border-radius: 12px;
+  background: #121e39;
+}
+
+.nexo-cal-summary strong {
+  font-size: 23px;
+  color: #f0f5ff;
+}
+
+.nexo-cal-summary span {
+  color: #aebfda;
+  font-size: 12px;
+}
+
+.nexo-cal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(290px, 1fr);
+  align-items: start;
+  gap: 17px;
+}
+
+.nexo-cal-panel,
+.nexo-cal-agenda {
+  padding: 18px;
+  min-width: 0;
+}
+
+.nexo-cal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 17px;
+}
+
+.nexo-cal-heading h2,
+.nexo-cal-agenda-head h2 {
+  color: #eaf1ff;
+  font-size: 18px;
+  text-transform: capitalize;
+  margin: 0;
+}
+
+.nexo-cal-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nexo-cal-actions .btn {
+  min-height: 34px;
+  padding: 6px 11px;
+}
+
+.nexo-extras-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #40557d;
+  background: #1b2a49;
+  color: #c0d2f0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.nexo-extras-icon:hover {
+  border-color: #7e9fe5;
+  background: #263d67;
+}
+
+.nexo-cal-weekdays,
+.nexo-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.nexo-cal-weekdays > span {
+  text-align: center;
+  padding: 11px 3px;
+  color: #94a8c8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nexo-cal-grid {
+  border-left: 1px solid #2f3e5d;
+  border-top: 1px solid #2f3e5d;
+}
+
+.nexo-cal-cell {
+  min-width: 0;
+  min-height: 96px;
+  padding: 9px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  border: 0;
+  border-right: 1px solid #2f3e5d;
+  border-bottom: 1px solid #2f3e5d;
+  background: #101b34;
+  color: #dce8ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nexo-cal-cell.blank {
+  background: #0e172a;
+  cursor: default;
+}
+
+.nexo-cal-cell:not(.blank):hover {
+  background: #203255;
+}
+
+.nexo-cal-cell.selected {
+  background: #203460;
+  box-shadow: inset 0 0 0 2px #669cff;
+}
+
+.nexo-cal-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  border-radius: 50%;
+}
+
+.nexo-cal-cell.today .nexo-cal-number {
+  color: white;
+  background: #417cf5;
+  font-weight: 700;
+}
+
+.nexo-cal-events {
+  display: grid;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.nexo-cal-dot {
+  display: block;
+  border-radius: 4px;
+  padding: 3px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.nexo-cal-dot.task {
+  color: #a6c4ff;
+  background: #4777e12b;
+}
+
+.nexo-cal-dot.closing {
+  color: #d4b5ff;
+  background: #9260db32;
+}
+
+.nexo-cal-events small {
+  font-size: 10px;
+  color: #aabbda;
+}
+
+.nexo-cal-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 12px;
+  color: #aebddb;
+  font-size: 11px;
+}
+
+.nexo-cal-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nexo-cal-legend i {
+  width: 9px;
+  height: 9px;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.nexo-cal-legend i.task {
+  background: #6a9fff;
+}
+
+.nexo-cal-legend i.closing {
+  background: #b28afe;
+}
+
+.nexo-cal-agenda-head > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8eaff1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nexo-cal-agenda-head h2 {
+  font-size: 16px;
+  margin: 7px 0 13px;
+}
+
+.nexo-cal-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #b0c2e1;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #334365;
+}
+
+.nexo-cal-switch input {
+  accent-color: #6095ff;
+}
+
+.nexo-cal-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 220px;
+  color: #a2b7d8;
+}
+
+.nexo-cal-empty strong {
+  color: #d7e5fb;
+  font-size: 13px;
+}
+
+.nexo-cal-empty p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.nexo-cal-agenda-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+}
+
+.nexo-cal-agenda-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid #304263;
+  background: transparent;
+  color: #d4e4ff;
+  text-align: left;
+}
+
+.nexo-cal-agenda-deal {
+  width: 100%;
+  cursor: pointer;
+}
+
+.nexo-cal-agenda-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nexo-cal-agenda-copy strong {
+  font-size: 12px;
+}
+
+.nexo-cal-agenda-copy strong.done {
+  text-decoration: line-through;
+  color: #879bb9;
+}
+
+.nexo-cal-agenda-copy small {
+  color: #9bafd1;
+  font-size: 11px;
+}
+
+.nexo-cal-closing-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #b18dfe;
+  margin: 0 10px;
+}
+
+.nexo-cal-footnote {
+  color: #91a7c7;
+  border-top: 1px solid #304263;
+  margin: 20px 0 0;
+  padding-top: 12px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* MENSAJERÍA */
+
+.nexo-messages-notice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  color: #c1d2ef;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px 16px;
+  background: #1a2a47;
+  border: 1px solid #425982;
+  border-radius: 11px;
+}
+
+.nexo-messages-notice svg {
+  color: #a6bfff;
+  flex: none;
+  margin-top: 1px;
+}
+
+.nexo-inbox {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  min-height: 510px;
+  border: 1px solid #34486a;
+  border-radius: 13px;
+  overflow: hidden;
+  background: #101b33;
+}
+
+.nexo-inbox-list {
+  min-width: 0;
+  border-right: 1px solid #34486a;
+  display: flex;
+  flex-direction: column;
+}
+
+.nexo-inbox-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 19px 17px 13px;
+}
+
+.nexo-inbox-list-head h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #e9f0ff;
+}
+
+.nexo-inbox-list-head span {
+  font-size: 12px;
+  color: #9fb5d8;
+}
+
+.nexo-inbox-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 13px 12px;
+  padding: 9px 11px;
+  background: #1a2945;
+  border: 1px solid #40547b;
+  border-radius: 9px;
+  color: #9fb5d8;
+}
+
+.nexo-inbox-search input {
+  width: 100%;
+  min-width: 0;
+  color: #edf3ff;
+  background: none;
+  border: 0;
+  outline: 0;
+  font-size: 12px;
+}
+
+.nexo-inbox-contacts {
+  max-height: 590px;
+  overflow: auto;
+}
+
+.nexo-inbox-contact {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 15px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #293956;
+  cursor: pointer;
+  color: #d9e7ff;
+}
+
+.nexo-inbox-contact:hover {
+  background: #1b2e51;
+}
+
+.nexo-inbox-contact.active {
+  background: #233966;
+}
+
+.nexo-inbox-contact > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.nexo-inbox-contact strong {
+  font-size: 12px;
+}
+
+.nexo-inbox-contact small {
+  color: #aec0dd;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nexo-inbox-no-results {
+  padding: 15px;
+  color: #a4b7d7;
+  font-size: 12px;
+}
+
+.nexo-inbox-thread {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nexo-inbox-thread-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 19px;
+  border-bottom: 1px solid #34486a;
+}
+
+.nexo-inbox-thread-head > div {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+}
+
+.nexo-inbox-thread-head strong {
+  font-size: 13px;
+}
+
+.nexo-inbox-thread-head small {
+  color: #a8bbd9;
+  font-size: 11px;
+}
+
+.nexo-inbox-status {
+  font-size: 10px;
+  padding: 5px 8px;
+  border: 1px solid #466080;
+  border-radius: 999px;
+  color: #afc1dd;
+}
+
+.nexo-inbox-empty-thread {
+  min-height: 410px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 30px;
+  text-align: center;
+}
+
+.nexo-inbox-hero {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 18px;
+  background: #4b6baf24;
+  color: #9bbdff;
+  border: 1px solid #44689c;
+}
+
+.nexo-inbox-empty-thread h2 {
+  color: #edf3ff;
+  font-size: 19px;
+  margin: 0;
+}
+
+.nexo-inbox-empty-thread p {
+  color: #aebfda;
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 420px;
+  margin: 0;
+}
+
+.nexo-inbox-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 7px;
+}
+
+.nexo-inbox-actions a {
+  text-decoration: none;
+}
+
+.nexo-inbox-unavailable {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #93a6c4;
+  font-size: 11px;
+  padding: 10px;
+}
+
+.nexo-inbox-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8da6c9;
+  font-size: 11px;
+  margin-top: 20px;
+}
+
+.nexo-extras button:focus-visible,
+.nexo-extras a:focus-visible {
+  outline: 2px solid #a5c6ff;
+  outline-offset: 3px;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 1100px) {
+  .nexo-cal-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 850px) {
+  .nexo-inbox {
+    grid-template-columns: 1fr;
+  }
+
+  .nexo-inbox-list {
+    border-right: 0;
+    border-bottom: 1px solid #34486a;
+  }
+
+  .nexo-inbox-contacts {
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 560px) {
+  .nexo-cal-cell {
+    min-height: 62px;
+    padding: 6px 3px;
+  }
+
+  .nexo-cal-dot {
+    font-size: 0;
+    height: 6px;
+    padding: 0;
+  }
+
+  .nexo-cal-events small {
+    font-size: 9px;
+  }
+
+  .nexo-cal-summary > div {
+    padding: 11px 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .nexo-cal-summary strong {
+    font-size: 20px;
+  }
+
+  .nexo-cal-summary span {
+    font-size: 10px;
+  }
+
+  .nexo-cal-panel,
+  .nexo-cal-agenda {
+    padding: 12px;
+  }
+
+  .nexo-cal-heading h2 {
+    font-size: 14px;
+  }
+
+  .nexo-inbox-thread-head {
+    flex-wrap: wrap;
+  }
+
+  .nexo-inbox-empty-thread {
+    padding: 20px 12px;
+  }
+}

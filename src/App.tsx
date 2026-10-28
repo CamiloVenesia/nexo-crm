@@ -7,6 +7,7 @@ import {
   Bell,
   Building2,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -15,6 +16,7 @@ import {
   GitBranch,
   LayoutDashboard,
   Menu,
+  MessageSquare,
   Plus,
   Search,
   Settings as SettingsIcon,
@@ -23,13 +25,13 @@ import {
   X,
 } from 'lucide-react';
 
-import { Brand, Avatar } from './components/Shared';
-import { EditorModal, Editing } from './components/EditorModal';
-
+import { Avatar, Brand } from './components/Shared';
+import { EditorModal } from './components/EditorModal';
+import type { Editing } from './components/EditorModal';
 import { CRMProvider, useCRM } from './lib/store';
-import { downloadJSON, overdue } from './lib/utils';
 import { searchCRM } from './lib/search';
-import { Page } from './types';
+import { downloadJSON, overdue } from './lib/utils';
+import type { Deal, Page, Task } from './types';
 
 import { Dashboard } from './views/Dashboard';
 import { Deals } from './views/Deals';
@@ -39,115 +41,86 @@ import { Tasks } from './views/Tasks';
 import { Activity } from './views/Activity';
 import { Insights } from './views/Insights';
 import { Settings } from './views/Settings';
+import { Messages } from './views/Messages';
+import { Calendar } from './views/Calendar';
 
 import './styles.css';
 
-const nav: {
-  id: Page;
+type WorkspacePage = Page | 'messages' | 'calendar';
+
+const nav = [
+  { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+  { id: 'messages', label: 'Mensajería', icon: MessageSquare },
+  { id: 'calendar', label: 'Calendario', icon: CalendarDays },
+  { id: 'tasks', label: 'Tareas', icon: CalendarClock },
+  { id: 'companies', label: 'Clientes', icon: Building2 },
+  { id: 'contacts', label: 'Contactos', icon: UsersRound },
+  { id: 'deals', label: 'Pipeline', icon: GitBranch },
+  { id: 'activity', label: 'Historial', icon: ActivityIcon },
+  { id: 'insights', label: 'Reportes', icon: Sparkles },
+] satisfies {
+  id: WorkspacePage;
   label: string;
   icon: typeof LayoutDashboard;
-}[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    id: 'deals',
-    label: 'Oportunidades',
-    icon: GitBranch,
-  },
-  {
-    id: 'contacts',
-    label: 'Contactos',
-    icon: UsersRound,
-  },
-  {
-    id: 'companies',
-    label: 'Empresas',
-    icon: Building2,
-  },
-  {
-    id: 'tasks',
-    label: 'Tareas',
-    icon: CalendarClock,
-  },
-  {
-    id: 'activity',
-    label: 'Actividad',
-    icon: ActivityIcon,
-  },
-  {
-    id: 'insights',
-    label: 'Reportes',
-    icon: Sparkles,
-  },
+}[];
+
+const validPages: WorkspacePage[] = [
+  ...nav.map((item) => item.id),
+  'settings',
 ];
 
 function WorkSpace() {
   const { data, notification } = useCRM();
 
-  const [page, setPage] = useState<Page>(() => {
-    const value = window.location.hash.replace('#/', '') as Page;
-
-    return [...nav.map((item) => item.id), 'settings'].includes(value)
-      ? value
-      : 'dashboard';
+  const [page, setPage] = useState<WorkspacePage>(() => {
+    const hash = window.location.hash.replace('#/', '') as WorkspacePage;
+    return validPages.includes(hash) ? hash : 'dashboard';
   });
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const navigate = (destination: Page) => {
+  const navigate = (destination: WorkspacePage) => {
     setPage(destination);
-
     window.location.hash = `/${destination}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    setMenuOpen(false);
     setSearchOpen(false);
     setAlertsOpen(false);
     setProfileOpen(false);
+    setMenuOpen(false);
   };
 
   useEffect(() => {
-    const onHash = () => {
-      const destination = window.location.hash.replace(
-        '#/',
-        '',
-      ) as Page;
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#/', '') as WorkspacePage;
 
-      if (
-        [...nav.map((item) => item.id), 'settings'].includes(
-          destination,
-        )
-      ) {
-        setPage(destination);
+      if (validPages.includes(hash)) {
+        setPage(hash);
       }
     };
 
-    window.addEventListener('hashchange', onHash);
+    window.addEventListener('hashchange', onHashChange);
 
     return () => {
-      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('hashchange', onHashChange);
     };
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const onKey = (event: KeyboardEvent) => {
       if (
-        (event.metaKey || event.ctrlKey) &&
+        (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === 'k'
       ) {
         event.preventDefault();
-
         searchRef.current?.focus();
         setSearchOpen(true);
       }
@@ -156,15 +129,15 @@ function WorkSpace() {
         setSearchOpen(false);
         setAlertsOpen(false);
         setProfileOpen(false);
-        setHelpOpen(false);
         setMenuOpen(false);
+        setHelpOpen(false);
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', onKey);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', onKey);
     };
   }, []);
 
@@ -172,73 +145,78 @@ function WorkSpace() {
     .filter((task) => !task.done && overdue(task.dueDate))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  // Una sola búsqueda para todo NEXO: tildes, empresas,
-  // contactos, responsables, notas y tareas vinculadas.
-  const matches = useMemo(() => {
-    return searchCRM(data, search, 8).flatMap((result) => {
-      const open = (): void => {
-        switch (result.kind) {
-          case 'deal': {
-            const value = data.deals.find((deal) => deal.id === result.id);
-            if (!value) return;
-            navigate('deals');
-            setEditing({ kind: 'deal', value });
-            break;
-          }
-          case 'contact': {
-            const value = data.contacts.find((item) => item.id === result.id);
-            if (!value) return;
-            navigate('contacts');
-            setEditing({ kind: 'contact', value });
-            break;
-          }
-          case 'company': {
-            const value = data.companies.find((item) => item.id === result.id);
-            if (!value) return;
-            navigate('companies');
-            setEditing({ kind: 'company', value });
-            break;
-          }
-          case 'task': {
-            const value = data.tasks.find((item) => item.id === result.id);
-            if (!value) return;
-            navigate('tasks');
-            setEditing({ kind: 'task', value });
-            break;
-          }
+  const matches = useMemo(
+    () => searchCRM(data, search, 8),
+    [data, search],
+  );
+
+  const openResult = (result: (typeof matches)[number]) => {
+    switch (result.kind) {
+      case 'deal': {
+        const value = data.deals.find(
+          (item) => item.id === result.id,
+        );
+
+        if (value) {
+          navigate('deals');
+          setEditing({ kind: 'deal', value });
         }
-        setSearch('');
-        setSearchOpen(false);
-      };
+        break;
+      }
 
-      return [{
-        key: `${result.kind}-${result.id}`,
-        label: result.title,
-        sub: result.detail,
-        action: open,
-      }];
-    });
-  }, [search, data]);
+      case 'contact': {
+        const value = data.contacts.find(
+          (item) => item.id === result.id,
+        );
 
-  const edit = (item: Editing) => {
-    setEditing(item);
+        if (value) {
+          navigate('contacts');
+          setEditing({ kind: 'contact', value });
+        }
+        break;
+      }
+
+      case 'company': {
+        const value = data.companies.find(
+          (item) => item.id === result.id,
+        );
+
+        if (value) {
+          navigate('companies');
+          setEditing({ kind: 'company', value });
+        }
+        break;
+      }
+
+      case 'task': {
+        const value = data.tasks.find(
+          (item) => item.id === result.id,
+        );
+
+        if (value) {
+          navigate('tasks');
+          setEditing({ kind: 'task', value });
+        }
+        break;
+      }
+    }
+
+    setSearch('');
+    setSearchOpen(false);
   };
 
-  const menuContent = (
-    <>
-      {nav.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          className={`nav-link ${page === id ? 'active' : ''}`}
-          aria-current={page === id ? 'page' : undefined}
-          onClick={() => navigate(id)}
-        >
-          <Icon size={16} />
-          {label}
-        </button>
-      ))}
-    </>
-  );
+  const navLinks = nav.map(({ id, label, icon: Icon }) => (
+    <button
+      key={id}
+      type="button"
+      className={`nav-link ${page === id ? 'active' : ''}`}
+      aria-current={page === id ? 'page' : undefined}
+      onClick={() => navigate(id)}
+    >
+      <Icon size={16} />
+      {label}
+    </button>
+  ));
 
   return (
     <div className="app-shell">
@@ -249,14 +227,18 @@ function WorkSpace() {
         <header className="topbar">
           <button
             className="brand-button"
+            type="button"
             onClick={() => navigate('dashboard')}
-            aria-label="Ir al dashboard"
+            aria-label="Ir al inicio"
           >
             <Brand />
           </button>
 
-          <nav className="topnav" aria-label="Navegación principal">
-            {menuContent}
+          <nav
+            className="topnav"
+            aria-label="Navegación principal"
+          >
+            {navLinks}
           </nav>
 
           <div className="topbar-tools">
@@ -275,30 +257,32 @@ function WorkSpace() {
 
               <input
                 ref={searchRef}
+                value={search}
                 placeholder="Buscar en NEXO..."
                 aria-label="Búsqueda global"
-                aria-expanded={searchOpen && search.trim().length >= 2}
+                aria-expanded={
+                  searchOpen && search.trim().length >= 2
+                }
                 aria-controls="nexo-global-search-results"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && matches[0]) {
-                    event.preventDefault();
-                    matches[0].action();
-                  }
-                }}
-                value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
                   setSearchOpen(true);
                 }}
                 onFocus={() => setSearchOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && matches[0]) {
+                    event.preventDefault();
+                    openResult(matches[0]);
+                  }
+                }}
               />
 
               <kbd>Ctrl K</kbd>
 
               {searchOpen && search.trim().length >= 2 && (
                 <div
-                  id="nexo-global-search-results"
                   className="search-dropdown"
+                  id="nexo-global-search-results"
                   role="region"
                   aria-label="Resultados de búsqueda"
                 >
@@ -307,30 +291,25 @@ function WorkSpace() {
                   </div>
 
                   {matches.length ? (
-                    matches.map((match) => (
+                    matches.map((result) => (
                       <button
-                        key={match.key}
                         type="button"
+                        key={`${result.kind}-${result.id}`}
                         onMouseDown={(event) =>
                           event.preventDefault()
                         }
-                        onClick={() => {
-                          match.action();
-                          setSearch('');
-                        }}
+                        onClick={() => openResult(result)}
                       >
                         <span>
-                          <strong>{match.label}</strong>
-                          <small>{match.sub}</small>
+                          <strong>{result.title}</strong>
+                          <small>{result.detail}</small>
                         </span>
 
                         <ArrowRight size={15} />
                       </button>
                     ))
                   ) : (
-                    <p>
-                      Sin coincidencias para “{search}”
-                    </p>
+                    <p>Sin coincidencias para “{search}”</p>
                   )}
                 </div>
               )}
@@ -338,6 +317,7 @@ function WorkSpace() {
 
             <div className="popover-anchor">
               <button
+                type="button"
                 className="tool-icon"
                 aria-label="Notificaciones"
                 aria-expanded={alertsOpen}
@@ -358,12 +338,13 @@ function WorkSpace() {
               {alertsOpen && (
                 <div className="floating-menu notifications">
                   <div className="dropdown-label">
-                    SEGUIMIENTOS PENDIENTES
+                    SEGUIMIENTOS VENCIDOS
                   </div>
 
                   {urgent.length ? (
                     urgent.slice(0, 4).map((task) => (
                       <button
+                        type="button"
                         key={task.id}
                         onClick={() => navigate('tasks')}
                       >
@@ -371,7 +352,9 @@ function WorkSpace() {
 
                         <span>
                           <strong>{task.title}</strong>
-                          <small>Vencida · Revisar tarea</small>
+                          <small>
+                            Tarea vencida · Revisar
+                          </small>
                         </span>
                       </button>
                     ))
@@ -382,6 +365,7 @@ function WorkSpace() {
                   )}
 
                   <button
+                    type="button"
                     className="menu-bottom"
                     onClick={() => navigate('tasks')}
                   >
@@ -394,6 +378,7 @@ function WorkSpace() {
 
             <div className="popover-anchor">
               <button
+                type="button"
                 className="profile-button"
                 aria-label="Menú de usuario"
                 aria-expanded={profileOpen}
@@ -423,6 +408,7 @@ function WorkSpace() {
                   <div className="menu-divider" />
 
                   <button
+                    type="button"
                     onClick={() => navigate('settings')}
                   >
                     <SettingsIcon size={16} />
@@ -430,6 +416,7 @@ function WorkSpace() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       downloadJSON(data);
                       setProfileOpen(false);
@@ -443,6 +430,7 @@ function WorkSpace() {
             </div>
 
             <button
+              type="button"
               className="mobile-menu-btn tool-icon"
               aria-label="Abrir menú"
               aria-expanded={menuOpen}
@@ -454,10 +442,14 @@ function WorkSpace() {
         </header>
 
         {menuOpen && (
-          <nav className="mobile-nav">
-            {menuContent}
+          <nav
+            className="mobile-nav"
+            aria-label="Menú móvil"
+          >
+            {navLinks}
 
             <button
+              type="button"
               className="nav-link"
               onClick={() => navigate('settings')}
             >
@@ -473,53 +465,30 @@ function WorkSpace() {
             aria-label="Accesos rápidos"
           >
             <div className="rail-top">
-              <button
-                title="Dashboard"
-                className={`rail-item ${
-                  page === 'dashboard' ? 'current' : ''
-                }`}
-                onClick={() => navigate('dashboard')}
-              >
-                <LayoutDashboard size={18} />
-              </button>
+              {nav.slice(0, 7).map(
+                ({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    title={label}
+                    aria-label={label}
+                    className={`rail-item ${
+                      page === id ? 'current' : ''
+                    }`}
+                    onClick={() => navigate(id)}
+                  >
+                    <Icon size={18} />
+                  </button>
+                ),
+              )}
 
               <button
-                title="Oportunidades"
-                className={`rail-item ${
-                  page === 'deals' ? 'current' : ''
-                }`}
-                onClick={() => navigate('deals')}
-              >
-                <GitBranch size={18} />
-              </button>
-
-              <button
-                title="Contactos"
-                className={`rail-item ${
-                  page === 'contacts' ? 'current' : ''
-                }`}
-                onClick={() => navigate('contacts')}
-              >
-                <UsersRound size={18} />
-              </button>
-
-              <button
-                title="Empresas"
-                className={`rail-item ${
-                  page === 'companies' ? 'current' : ''
-                }`}
-                onClick={() => navigate('companies')}
-              >
-                <Building2 size={18} />
-              </button>
-
-              <button
+                type="button"
                 title="Nueva oportunidad"
+                aria-label="Nueva oportunidad"
                 className="rail-item rail-plus"
                 onClick={() =>
-                  edit({
-                    kind: 'deal',
-                  })
+                  setEditing({ kind: 'deal' })
                 }
               >
                 <Plus size={18} />
@@ -527,51 +496,42 @@ function WorkSpace() {
 
               <div className="rail-separator" />
 
-              <button
-                title="Tareas"
-                className={`rail-item ${
-                  page === 'tasks' ? 'current' : ''
-                }`}
-                onClick={() => navigate('tasks')}
-              >
-                <CalendarClock size={18} />
-              </button>
-
-              <button
-                title="Actividad"
-                className={`rail-item ${
-                  page === 'activity' ? 'current' : ''
-                }`}
-                onClick={() => navigate('activity')}
-              >
-                <ActivityIcon size={18} />
-              </button>
-
-              <button
-                title="Reportes"
-                className={`rail-item ${
-                  page === 'insights' ? 'current' : ''
-                }`}
-                onClick={() => navigate('insights')}
-              >
-                <Sparkles size={18} />
-              </button>
+              {nav.slice(7).map(
+                ({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    title={label}
+                    aria-label={label}
+                    className={`rail-item ${
+                      page === id ? 'current' : ''
+                    }`}
+                    onClick={() => navigate(id)}
+                  >
+                    <Icon size={18} />
+                  </button>
+                ),
+              )}
             </div>
 
             <div className="rail-bottom">
               <button
+                type="button"
                 className="rail-item"
                 title="Ayuda"
+                aria-label="Ayuda"
                 onClick={() => setHelpOpen(true)}
               >
                 <CircleHelp size={18} />
               </button>
 
               <button
+                type="button"
                 className={`rail-item ${
                   page === 'settings' ? 'current' : ''
                 }`}
                 title="Configuración"
+                aria-label="Configuración"
                 onClick={() => navigate('settings')}
               >
                 <SettingsIcon size={18} />
@@ -583,60 +543,71 @@ function WorkSpace() {
             {page === 'dashboard' && (
               <Dashboard
                 navigate={navigate}
-                newDeal={() => edit({ kind: 'deal' })}
-                editDeal={(value) =>
-                  edit({
-                    kind: 'deal',
-                    value,
-                  })
+                newDeal={() =>
+                  setEditing({ kind: 'deal' })
+                }
+                editDeal={(value: Deal) =>
+                  setEditing({ kind: 'deal', value })
                 }
               />
             )}
 
-            {page === 'deals' && (
-              <Deals
-                onAdd={() => edit({ kind: 'deal' })}
-                onEdit={(value) =>
-                  edit({
-                    kind: 'deal',
-                    value,
-                  })
-                }
-              />
-            )}
+            {page === 'messages' && <Messages />}
 
-            {page === 'contacts' && (
-              <Contacts
-                onAdd={() => edit({ kind: 'contact' })}
-                onEdit={(value) =>
-                  edit({
-                    kind: 'contact',
-                    value,
-                  })
+            {page === 'calendar' && (
+              <Calendar
+                onNewTask={() =>
+                  setEditing({ kind: 'task' })
                 }
-              />
-            )}
-
-            {page === 'companies' && (
-              <Companies
-                onAdd={() => edit({ kind: 'company' })}
-                onEdit={(value) =>
-                  edit({
-                    kind: 'company',
-                    value,
-                  })
+                onEditTask={(value: Task) =>
+                  setEditing({ kind: 'task', value })
+                }
+                onEditDeal={(value: Deal) =>
+                  setEditing({ kind: 'deal', value })
                 }
               />
             )}
 
             {page === 'tasks' && (
               <Tasks
-                onAdd={() => edit({ kind: 'task' })}
+                onAdd={() =>
+                  setEditing({ kind: 'task' })
+                }
+                onEdit={(value: Task) =>
+                  setEditing({ kind: 'task', value })
+                }
+              />
+            )}
+
+            {page === 'companies' && (
+              <Companies
+                onAdd={() =>
+                  setEditing({ kind: 'company' })
+                }
                 onEdit={(value) =>
-                  edit({
-                    kind: 'task',
-                    value,
-                  })
+                  setEditing({ kind: 'company', value })
+                }
+              />
+            )}
+
+            {page === 'contacts' && (
+              <Contacts
+                onAdd={() =>
+                  setEditing({ kind: 'contact' })
+                }
+                onEdit={(value) =>
+                  setEditing({ kind: 'contact', value })
+                }
+              />
+            )}
+
+            {page === 'deals' && (
+              <Deals
+                onAdd={() =>
+                  setEditing({ kind: 'deal' })
+                }
+                onEdit={(value: Deal) =>
+                  setEditing({ kind: 'deal', value })
                 }
               />
             )}
@@ -667,7 +638,7 @@ function WorkSpace() {
       {searchOpen && (
         <button
           className="dismiss-popovers"
-          title="Cerrar búsqueda"
+          aria-label="Cerrar búsqueda"
           onClick={() => setSearchOpen(false)}
           tabIndex={-1}
         />
@@ -711,6 +682,7 @@ function WorkSpace() {
 
               <button
                 className="icon-btn"
+                type="button"
                 onClick={() => setHelpOpen(false)}
                 aria-label="Cerrar"
               >
@@ -718,59 +690,54 @@ function WorkSpace() {
               </button>
             </header>
 
+            
             <h2>
               Todo lo importante,
               <br />
               <span>en un solo lugar.</span>
             </h2>
 
+
             <p>
-              Empezá registrando una empresa, sumá sus contactos
-              y creá una oportunidad comercial. Movela por las
-              etapas del pipeline y agregá tareas para recordar
-              el próximo paso.
+              Registrá un cliente, sumá sus contactos,
+              creá oportunidades y tareas. El Calendario
+              organiza los vencimientos; Mensajería reúne
+              los accesos a canales externos hasta su
+              integración real.
             </p>
 
             <ol>
               <li>
-                <strong>Empresas</strong> — Registrá las
-                organizaciones.
+                <strong>Clientes</strong> — Organizaciones.
               </li>
-
               <li>
-                <strong>Contactos</strong> — Guardá a las
-                personas involucradas.
+                <strong>Contactos</strong> — Personas asociadas.
               </li>
-
               <li>
-                <strong>Oportunidades</strong> — Seguimiento
-                de ventas y presupuestos.
+                <strong>Pipeline</strong> — Oportunidades de venta.
               </li>
-
               <li>
-                <strong>Tareas</strong> — Recordatorios
-                concretos con vencimiento.
+                <strong>Tareas y Calendario</strong> — Próximas acciones.
               </li>
-
               <li>
-                <strong>Insights</strong> — Estadísticas que
-                se actualizan automáticamente.
+                <strong>Historial y Reportes</strong> — Seguimiento de resultados.
               </li>
             </ol>
 
             <p className="hint-row">
-              Podés experimentar sin riesgo: Configuración →
-              Reiniciar demo.
+              Esta versión es una demo local. Exportá
+              respaldos desde Configuración.
             </p>
 
             <button
+              type="button"
               className="btn btn-primary"
               onClick={() => {
                 setHelpOpen(false);
                 navigate('deals');
               }}
             >
-              Explorar oportunidades
+              Explorar pipeline
               <ArrowRight size={16} />
             </button>
           </section>

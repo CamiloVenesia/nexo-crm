@@ -1,0 +1,87 @@
+
+/* NEXO CRM — Tareas e Historial: claridad sin rediseñar la identidad. */
+.nexo-simple-page{display:grid;gap:16px;min-width:0}
+.nexo-simple-page .page-heading{margin-bottom:0}
+.nexo-simple-panel{padding:0;overflow:hidden}
+.nexo-simple-eyebrow{font-size:10px;font-weight:800;letter-spacing:.12em;color:#9cbbf5}
+
+/* Prioridades del día */
+.nexo-task-overview,.nexo-history-intro{display:flex;align-items:center;gap:15px;padding:17px 19px;border-radius:12px;border:1px solid #3b5281;background:linear-gradient(110deg,#152d59,#151e43 75%,#23204b)}
+.nexo-task-overview-icon{height:42px;width:42px;flex:0 0 42px;display:grid;place-items:center;color:#b9d0ff;border:1px solid #526da2;border-radius:11px;background:#4566a12b}
+.nexo-task-overview h2{font-size:18px;line-height:1.35;color:#f1f5ff;margin:4px 0}
+.nexo-task-overview p,.nexo-history-intro p{font-size:12px;line-height:1.55;color:#b7c8e6;margin:0}
+.nexo-task-navigation{display:flex;gap:8px;flex-wrap:wrap}
+.nexo-task-tab{display:inline-flex;align-items:center;gap:9px;min-height:41px;border:1px solid #34486f;border-radius:9px;padding:9px 12px;background:#182742;color:#c3d1ea;font-size:12px;font-weight:650;cursor:pointer}
+.nexo-task-tab span{font-variant-numeric:tabular-nums;color:#b6c7e4;font-size:11px;padding:2px 6px;border-radius:6px;background:#ffffff12}
+.nexo-task-tab.selected{border-color:#719df0;background:#264778;color:#f5f8ff}
+.nexo-task-tab-alert:not(.selected) span{color:#ffb6c2;background:#e55c7826}
+.nexo-task-tab:hover{border-color:#7398d8}
+
+/* Barra de filtros compartida */
+.nexo-simple-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:15px 17px;border-bottom:1px solid #2e405f}
+.nexo-simple-search{display:flex;align-items:center;gap:9px;flex:1 1 240px;max-width:460px;border:1px solid #41577e;background:#192943;border-radius:9px;padding:10px 12px;color:#9dbbe8}
+.nexo-simple-search input{min-width:0;width:100%;background:transparent;border:0;outline:0;color:#eef4ff;font-size:12px}
+.nexo-simple-search input::placeholder{color:#9aafce}
+.nexo-simple-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.nexo-simple-select{display:flex;align-items:center;gap:7px;color:#a9bde2}
+.nexo-simple-select select{min-height:39px;border-radius:8px;border:1px solid #41577e;background:#192943;color:#d9e6fd;font-size:12px;padding:6px 9px;max-width:210px}
+.nexo-simple-result-count{display:flex;align-items:center;gap:7px;padding:11px 18px;color:#a9bedf;font-size:11px;background:#ffffff03;border-bottom:1px solid #273856}
+
+/* Tareas ordenadas en grupos claramente diferenciados */
+.nexo-task-group{padding:0 18px}
+.nexo-task-group+.nexo-task-group{border-top:1px solid #34476a}
+.nexo-task-group-heading{padding:18px 0 9px}
+.nexo-task-group-heading h2{display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.35;color:#eff4ff;margin:0}
+.nexo-task-group-heading h2 span{font-size:11px;color:#acc5ef;padding:2px 7px;border-radius:7px;background:#526c9a32}
+.nexo-task-group-heading p{margin:3px 0 0;font-size:11px;color:#a9bbd9}
+.nexo-task-item{display:flex;align-items:center;gap:13px;min-width:0;padding:14px 2px;border-top:1px solid #263956}
+.nexo-task-complete{position:relative;display:grid;place-items:center;cursor:pointer;flex:0 0 32px;width:32px;height:32px;border:1px solid #465f8a;border-radius:9px;background:#182947;color:#7997c4}
+.nexo-task-complete:hover{color:#76e9cf;border-color:#5ca995}
+.nexo-task-complete input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.nexo-task-complete:has(input:checked){border-color:#398b7c;background:#1c534c;color:#7ef1d2}
+.nexo-task-complete:has(input:focus-visible){outline:2px solid #a7c4ff;outline-offset:3px}
+.nexo-task-info{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:inherit;cursor:pointer;padding:0}
+.nexo-task-info strong{display:block;color:#ecf2ff;font-size:13px;line-height:1.5}
+.nexo-task-info small{display:block;color:#afc0df;font-size:11px;margin-top:3px;line-height:1.45}
+.nexo-task-info span{display:block;color:#95aac9;font-size:11px;margin-top:4px;line-height:1.45;overflow-wrap:anywhere}
+.nexo-task-info:hover strong{color:#a9caff}
+.nexo-task-item.is-done .nexo-task-info strong{text-decoration:line-through;color:#94abc9}
+.nexo-task-meta{display:flex;align-items:center;justify-content:flex-end;gap:13px;flex-wrap:wrap}
+.nexo-task-due{display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b6c9e5}
+.nexo-task-due.late{color:#ffacbb}
+.nexo-simple-empty{min-height:230px;padding:36px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;text-align:center;color:#9ab6dc}
+.nexo-simple-empty strong{font-size:14px;color:#e9f1ff}
+.nexo-simple-empty p{margin:0 0 5px;font-size:12px;color:#a8bbdb;line-height:1.55}
+.nexo-simple-footnote{display:flex;align-items:flex-start;gap:8px;margin:0;color:#a2b6d6;font-size:11px;line-height:1.6}
+.nexo-simple-footnote svg{flex:none;margin-top:1px}
+
+/* Historial cronológico, agrupa eventos existentes sin inventar autores */
+.nexo-history-intro{background:#182740;border-color:#344c72;align-items:flex-start}
+.nexo-history-intro>svg{flex:none;margin-top:2px;color:#9abaff}
+.nexo-history-intro strong{color:#e6eeff;font-size:12px;display:block;margin-bottom:4px}
+.nexo-history-categories{display:flex;gap:7px;flex-wrap:wrap;padding:14px 17px;border-bottom:1px solid #2e405f}
+.nexo-history-categories button{min-height:35px;border:1px solid transparent;border-radius:8px;background:transparent;color:#acbfdf;padding:7px 10px;font-size:11px;font-weight:650;cursor:pointer}
+.nexo-history-categories button:hover{background:#293e65;color:#f1f6ff}
+.nexo-history-categories button.selected{background:#294a80;border-color:#486fba;color:#fff}
+.nexo-history-days{padding:5px 20px 10px}
+.nexo-history-day>h2{font-size:12px;font-weight:750;color:#a3bdeb;text-transform:capitalize;padding:16px 0 7px;margin:0}
+.nexo-history-day+.nexo-history-day{border-top:1px solid #314364}
+.nexo-history-entry{display:flex;gap:13px;align-items:flex-start;padding:12px 0}
+.nexo-history-icon{display:grid;place-items:center;flex:0 0 35px;width:35px;height:35px;border-radius:10px;border:1px solid #4569a7;background:#264778;color:#a7c6ff}
+.nexo-history-icon.type-task{background:#20514b;border-color:#3b877b;color:#83eacb}
+.nexo-history-icon.type-contact,.nexo-history-icon.type-note{background:#392c59;border-color:#69518f;color:#c7aaff}
+.nexo-history-icon.type-company{background:#2d4155;border-color:#536c86;color:#c6dafa}
+.nexo-history-icon.type-system{background:#493c55;border-color:#695475;color:#e0bddf}
+.nexo-history-entry-content{min-width:0;flex:1}
+.nexo-history-entry-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.nexo-history-entry-top strong{font-size:12px;line-height:1.5;color:#edf3ff}
+.nexo-history-entry-top time{display:flex;align-items:center;gap:5px;white-space:nowrap;color:#9db3d5;font-size:11px}
+.nexo-history-entry p{margin:5px 0 7px;color:#b5c5e1;font-size:12px;overflow-wrap:anywhere;line-height:1.55}
+.nexo-history-kind{font-size:10px;color:#a1b8dc;display:inline-flex;align-items:center;border-radius:7px;padding:4px 7px;background:#405c8a33}
+.nexo-history-more{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:15px 20px;border-top:1px solid #304363}
+.nexo-history-more span{font-size:11px;color:#a5b9d9}
+
+.nexo-simple-page button:focus-visible,.nexo-simple-page input:focus-visible,.nexo-simple-page select:focus-visible{outline:2px solid #a5c8ff;outline-offset:3px}
+@media(max-width:850px){.nexo-simple-search{max-width:none}.nexo-simple-toolbar{align-items:stretch}.nexo-simple-actions{width:100%;justify-content:space-between}}
+@media(max-width:560px){.nexo-task-overview{padding:14px}.nexo-task-navigation{gap:6px}.nexo-task-tab{padding:8px 9px;min-height:37px;font-size:11px}.nexo-task-group{padding:0 12px}.nexo-task-item{gap:9px;align-items:flex-start}.nexo-task-meta{flex-direction:column;gap:6px;align-items:flex-end}.nexo-simple-toolbar{padding:12px}.nexo-simple-select{flex:1}.nexo-simple-select select{max-width:100%;width:100%}.nexo-history-days{padding:4px 12px}.nexo-history-categories{padding:10px}.nexo-history-entry-top{flex-wrap:wrap;gap:5px}.nexo-history-entry-top time{order:2}}
+@media(prefers-reduced-motion:reduce){.nexo-simple-page *{scroll-behavior:auto}}

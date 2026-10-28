@@ -1,53 +1,40 @@
 
 import { useMemo, useState } from 'react';
-
 import {
   Activity as ActivityIcon,
   BadgeCheck,
   Building2,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   Download,
   FileText,
   GitBranch,
   Search,
+  SlidersHorizontal,
   UserRound,
 } from 'lucide-react';
 
+import { PageHeading } from '../components/Shared';
 import { useCRM } from '../lib/store';
-import { csvDownload, fmtDateTime } from '../lib/utils';
-import type { ActivityType } from '../types';
-import { Empty, PageHeading } from '../components/Shared';
+import { csvDownload, toDateInput } from '../lib/utils';
+import type { Activity as CRMActivity, ActivityType } from '../types';
 
-import './activity-focus.css';
+import './task-history-refresh.css';
 
-type Category = 'all' | ActivityType;
+type Category = 'all' | 'sales' | 'tasks' | 'clients' | 'system' | 'notes';
 type Period = 'all' | '7d' | '30d';
-type Order = 'newest' | 'oldest';
 
-const categoryOptions: {
-  value: Category;
-  label: string;
-}[] = [
-  { value: 'all', label: 'Todo' },
-  { value: 'deal', label: 'Oportunidades' },
-  { value: 'task', label: 'Tareas' },
-  { value: 'contact', label: 'Contactos' },
-  { value: 'company', label: 'Empresas' },
-  { value: 'note', label: 'Notas' },
+const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'sales', label: 'Negocios' },
+  { value: 'tasks', label: 'Tareas' },
+  { value: 'clients', label: 'Clientes y contactos' },
   { value: 'system', label: 'Sistema' },
+  { value: 'notes', label: 'Notas' },
 ];
 
-const labels: Record<ActivityType, string> = {
-  deal: 'Oportunidad',
-  task: 'Tarea',
-  contact: 'Contacto',
-  company: 'Empresa',
-  note: 'Nota',
-  system: 'Sistema',
-};
-
-const icons: Record<ActivityType, typeof ActivityIcon> = {
+const ICONS: Record<ActivityType, typeof ActivityIcon> = {
   deal: GitBranch,
   task: CheckCircle2,
   contact: UserRound,
@@ -56,321 +43,249 @@ const icons: Record<ActivityType, typeof ActivityIcon> = {
   system: BadgeCheck,
 };
 
-const normalize = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('es-AR')
-    .trim();
+const TYPE_LABELS: Record<ActivityType, string> = {
+  deal: 'Negocio',
+  task: 'Tarea',
+  contact: 'Contacto',
+  company: 'Cliente',
+  note: 'Nota',
+  system: 'Configuración',
+};
+
+const ENTITY_NAMES: Record<ActivityType, string> = {
+  deal: 'una oportunidad',
+  task: 'una tarea',
+  contact: 'un contacto',
+  company: 'un cliente',
+  note: 'una nota',
+  system: 'un ajuste',
+};
+
+function eventTitle(event: CRMActivity): string {
+  switch (event.title) {
+    case 'Nuevo registro': return `Se creó ${ENTITY_NAMES[event.type]}`;
+    case 'Registro actualizado': return `Se actualizó ${ENTITY_NAMES[event.type]}`;
+    case 'Registro eliminado': return `Se eliminó ${ENTITY_NAMES[event.type]}`;
+    case 'Etapa actualizada': return 'Se cambió la etapa de una oportunidad';
+    case 'Venta ganada': return 'Se ganó una oportunidad';
+    case 'Oportunidad perdida': return 'Se perdió una oportunidad';
+    case 'Tarea completada': return 'Se completó una tarea';
+    case 'Tarea reabierta': return 'Se reabrió una tarea';
+    default: return event.title;
+  }
+}
+
+function matchesCategory(type: ActivityType, category: Category): boolean {
+  if (category === 'all') return true;
+  if (category === 'sales') return type === 'deal';
+  if (category === 'tasks') return type === 'task';
+  if (category === 'clients') return type === 'company' || type === 'contact';
+  if (category === 'notes') return type === 'note';
+  return type === 'system';
+}
+
+const clean = (text: string) =>
+  text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+function dayInfo(value: string, today: string, yesterday: string): { key: string; label: string } {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return { key: 'unknown', label: 'Sin fecha registrada' };
+  const key = toDateInput(parsed);
+  if (key === today) return { key, label: 'Hoy' };
+  if (key === yesterday) return { key, label: 'Ayer' };
+  return {
+    key,
+    label: new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parsed),
+  };
+}
 
 const PAGE_SIZE = 30;
 
 export function Activity() {
   const { data, notify } = useCRM();
-
-  const [type, setType] = useState<Category>('all');
-  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<Category>('all');
   const [period, setPeriod] = useState<Period>('all');
-  const [order, setOrder] = useState<Order>('newest');
+  const [search, setSearch] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const list = useMemo(() => {
-    const query = normalize(search);
-    const now = Date.now();
+  const today = toDateInput(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = toDateInput(yesterdayDate);
 
-    const cutoff =
-      period === '7d'
-        ? now - 7 * 24 * 60 * 60 * 1000
-        : period === '30d'
-          ? now - 30 * 24 * 60 * 60 * 1000
-          : null;
+  const list = useMemo(() => {
+    const query = clean(search);
+    const now = Date.now();
+    const cutoff = period === '7d'
+      ? now - 7 * 24 * 60 * 60 * 1000
+      : period === '30d'
+        ? now - 30 * 24 * 60 * 60 * 1000
+        : null;
 
     return data.activities
-      .filter((activity) => {
-        if (
-          type !== 'all' &&
-          activity.type !== type
-        ) {
-          return false;
-        }
-
-        const timestamp = Date.parse(
-          activity.createdAt,
-        );
-
-        if (
-          cutoff !== null &&
-          (!Number.isFinite(timestamp) ||
-            timestamp < cutoff ||
-            timestamp > now)
-        ) {
-          return false;
-        }
-
-        return normalize(
-          `${activity.title} ${activity.detail}`,
-        ).includes(query);
+      .filter((event) => {
+        if (!matchesCategory(event.type, category)) return false;
+        const stamp = Date.parse(event.createdAt);
+        if (cutoff !== null && (!Number.isFinite(stamp) || stamp < cutoff || stamp > now)) return false;
+        return clean([event.title, eventTitle(event), event.detail, TYPE_LABELS[event.type]].join(' ')).includes(query);
       })
-      .sort((a, b) => {
-        const dateA = Date.parse(a.createdAt) || 0;
-        const dateB = Date.parse(b.createdAt) || 0;
-
-        return order === 'newest'
-          ? dateB - dateA
-          : dateA - dateB;
-      });
-  }, [
-    data.activities,
-    type,
-    search,
-    period,
-    order,
-  ]);
+      .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+  }, [data.activities, category, period, search]);
 
   const shown = list.slice(0, visibleCount);
+  const days = useMemo(() => {
+    const groups: { key: string; label: string; entries: CRMActivity[] }[] = [];
+    for (const entry of shown) {
+      const { key, label } = dayInfo(entry.createdAt, today, yesterday);
+      const last = groups[groups.length - 1];
+      if (last?.key === key) last.entries.push(entry);
+      else groups.push({ key, label, entries: [entry] });
+    }
+    return groups;
+  }, [shown, today, yesterday]);
 
-  const resetFilters = () => {
-    setType('all');
-    setSearch('');
-    setPeriod('all');
-    setOrder('newest');
+  const setCategoryAndReset = (next: Category) => {
+    setCategory(next);
     setVisibleCount(PAGE_SIZE);
   };
 
   const exportCsv = () => {
-    csvDownload('nexo-actividad.csv', [
-      [
-        'Fecha',
-        'Categoría',
-        'Movimiento',
-        'Detalle',
-      ],
-      ...list.map((activity) => [
-        activity.createdAt,
-        labels[activity.type],
-        activity.title,
-        activity.detail,
-      ]),
+    csvDownload('nexo-historial.csv', [
+      ['Fecha', 'Tipo', 'Movimiento', 'Detalle'],
+      ...list.map((event) => [event.createdAt, TYPE_LABELS[event.type], eventTitle(event), event.detail]),
     ]);
+    notify('Historial exportado a CSV.');
+  };
 
-    notify('Actividad exportada a CSV');
+  const clearFilters = () => {
+    setCategory('all');
+    setPeriod('all');
+    setSearch('');
+    setVisibleCount(PAGE_SIZE);
   };
 
   return (
-    <>
+    <div className="nexo-simple-page">
       <PageHeading
-        eyebrow="TRAZABILIDAD / HISTORIAL"
-        title="Actividad reciente"
-        subtitle="Buscá y consultá los movimientos registrados en tu espacio de trabajo."
+        eyebrow="SEGUIMIENTO / HISTORIAL"
+        title="Historial"
+        subtitle="Un registro de lo que pasó en NEXO, ordenado del movimiento más reciente al más antiguo."
       />
 
-      <div className="panel full-panel">
-        {/* CATEGORÍAS */}
+      <section className="nexo-history-intro" aria-label="Qué muestra el historial">
+        <ActivityIcon size={20} />
+        <div>
+          <strong>¿Para qué sirve esta sección?</strong>
+          <p>Acá podés consultar qué se creó, modificó, completó o eliminó. No son tareas pendientes: son acciones que ya ocurrieron.</p>
+        </div>
+      </section>
 
-        <div className="toolbar activity-toolbar">
-          <div
-            className="tab-row activity-category-tabs"
-            aria-label="Filtrar por categoría"
-          >
-            {categoryOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={
-                  type === option.value
-                    ? 'active'
-                    : ''
-                }
-                aria-pressed={
-                  type === option.value
-                }
-                onClick={() => {
-                  setType(option.value);
-                  setVisibleCount(PAGE_SIZE);
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <span className="muted activity-counter">
-            <ActivityIcon size={15} />
-
-            {list.length} movimiento
-            {list.length === 1 ? '' : 's'}
-          </span>
+      <section className="panel nexo-simple-panel">
+        <div className="nexo-history-categories" aria-label="Tipos de movimientos">
+          {CATEGORY_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={category === value ? 'selected' : ''}
+              aria-pressed={category === value}
+              onClick={() => setCategoryAndReset(value)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {/* BÚSQUEDA Y FILTROS */}
-
-        <div className="activity-filter-bar">
-          <div className="search-field activity-search">
-            <Search size={17} />
-
+        <div className="nexo-simple-toolbar">
+          <label className="nexo-simple-search">
+            <Search size={16} />
             <input
               type="search"
-              aria-label="Buscar en el historial"
-              placeholder="Buscar por título o detalle..."
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setVisibleCount(PAGE_SIZE);
-              }}
+              aria-label="Buscar en el historial"
+              placeholder="Buscar un cliente, negocio o movimiento..."
+              onChange={(event) => { setSearch(event.target.value); setVisibleCount(PAGE_SIZE); }}
             />
-          </div>
-
-          <div className="activity-filter-controls">
-            <select
-              className="select-filter"
-              aria-label="Filtrar por período"
-              value={period}
-              onChange={(event) => {
-                setPeriod(
-                  event.target.value as Period,
-                );
-                setVisibleCount(PAGE_SIZE);
-              }}
-            >
-              <option value="all">
-                Todas las fechas
-              </option>
-
-              <option value="7d">
-                Últimos 7 días
-              </option>
-
-              <option value="30d">
-                Últimos 30 días
-              </option>
-            </select>
-
-            <select
-              className="select-filter"
-              aria-label="Ordenar movimientos"
-              value={order}
-              onChange={(event) => {
-                setOrder(
-                  event.target.value as Order,
-                );
-                setVisibleCount(PAGE_SIZE);
-              }}
-            >
-              <option value="newest">
-                Más recientes
-              </option>
-
-              <option value="oldest">
-                Más antiguos
-              </option>
-            </select>
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={exportCsv}
-            >
-              <Download size={15} />
-              CSV
-            </button>
-          </div>
-        </div>
-
-        {/* HISTORIAL */}
-
-        <div className="timeline activity-timeline">
-          {shown.map((activity) => {
-            const Icon = icons[activity.type];
-
-            return (
-              <div
-                className="timeline-item"
-                key={activity.id}
+          </label>
+          <div className="nexo-simple-actions">
+            <label className="nexo-simple-select">
+              <SlidersHorizontal size={15} />
+              <select
+                aria-label="Filtrar por período"
+                value={period}
+                onChange={(event) => { setPeriod(event.target.value as Period); setVisibleCount(PAGE_SIZE); }}
               >
-                <div
-                  className={`timeline-icon timeline-${activity.type}`}
-                >
-                  <Icon size={17} />
-                </div>
-
-                <div className="activity-entry">
-                  <span className="activity-entry-type">
-                    {labels[activity.type]}
-                  </span>
-
-                  <strong>
-                    {activity.title}
-                  </strong>
-
-                  <p>
-                    {activity.detail ||
-                      'Sin detalles adicionales.'}
-                  </p>
-
-                  <small>
-                    <Clock3 size={12} />
-                    {fmtDateTime(
-                      activity.createdAt,
-                    )}
-                  </small>
-                </div>
-              </div>
-            );
-          })}
+                <option value="all">Todas las fechas</option>
+                <option value="7d">Últimos 7 días</option>
+                <option value="30d">Últimos 30 días</option>
+              </select>
+            </label>
+            <button type="button" className="btn btn-outline" onClick={exportCsv}>
+              <Download size={15} /> Exportar CSV
+            </button>
+          </div>
         </div>
 
-        {/* SIN RESULTADOS */}
+        <div className="nexo-simple-result-count" role="status">
+          <CalendarDays size={14} /> {list.length} movimiento{list.length === 1 ? '' : 's'} encontrados
+        </div>
 
-        {!list.length && (
-          <div className="activity-empty">
-            <Empty
-              title="No hay movimientos para mostrar"
-              detail="Probá otra búsqueda, categoría o período."
-            />
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={resetFilters}
-            >
-              Limpiar filtros
-            </button>
+        {days.length ? (
+          <div className="nexo-history-days">
+            {days.map((day) => (
+              <section className="nexo-history-day" key={day.key}>
+                <h2>{day.label}</h2>
+                <div className="nexo-history-entries">
+                  {day.entries.map((event) => {
+                    const Icon = ICONS[event.type];
+                    const parsed = new Date(event.createdAt);
+                    const time = Number.isFinite(parsed.getTime())
+                      ? parsed.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                      : 'Hora no disponible';
+                    return (
+                      <article className="nexo-history-entry" key={event.id}>
+                        <span className={`nexo-history-icon type-${event.type}`}><Icon size={17} /></span>
+                        <div className="nexo-history-entry-content">
+                          <div className="nexo-history-entry-top">
+                            <strong>{eventTitle(event)}</strong>
+                            <time dateTime={event.createdAt}><Clock3 size={12} /> {time}</time>
+                          </div>
+                          {event.detail && <p>{event.detail}</p>}
+                          <span className="nexo-history-kind">{TYPE_LABELS[event.type]}</span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="nexo-simple-empty">
+            <ActivityIcon size={26} />
+            <strong>No hay movimientos para esta búsqueda</strong>
+            <p>Podés cambiar el período o elegir otro tipo de movimiento.</p>
+            <button type="button" className="btn btn-outline" onClick={clearFilters}>Ver todo el historial</button>
           </div>
         )}
 
-        {/* MOSTRAR MÁS */}
-
         {shown.length < list.length && (
-          <div className="activity-more">
-            <span>
-              Mostrando {shown.length} de{' '}
-              {list.length} movimientos
-            </span>
-
+          <div className="nexo-history-more">
+            <span>Mostrando {shown.length} de {list.length}</span>
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() =>
-                setVisibleCount(
-                  (count) => count + PAGE_SIZE,
-                )
-              }
+              onClick={() => setVisibleCount((current) => current + PAGE_SIZE)}
             >
               Mostrar más
             </button>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="hint-row activity-hint">
-        <ActivityIcon size={15} />
-
-        Esta demo conserva hasta 150 movimientos
-        recientes. Algunos eventos históricos
-        incluyen solo una descripción breve;
-        el registro no es una auditoría
-        completa de cambios.
-      </div>
-    </>
+      <p className="nexo-simple-footnote">
+        <ActivityIcon size={15} /> Esta demo conserva como máximo los últimos 150 movimientos.
+        No registra aún qué usuario realizó cada cambio ni representa una auditoría de seguridad completa.
+      </p>
+    </div>
   );
 }

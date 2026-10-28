@@ -1,11 +1,8 @@
 
 import { useMemo, useState } from 'react';
-
 import {
   CalendarDays,
-  CheckCheck,
-  CircleCheckBig,
-  ClipboardCheck,
+  CheckCircle2,
   Clock3,
   Download,
   Plus,
@@ -13,119 +10,121 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 
-import { useCRM } from '../lib/store';
-import type { Task } from '../types';
-import {
-  csvDownload,
-  fmtDate,
-  overdue,
-  todayDue,
-  toDateInput,
-} from '../lib/utils';
 import { Empty, PageHeading, Tag } from '../components/Shared';
+import { useCRM } from '../lib/store';
+import { csvDownload, fmtDate, toDateInput } from '../lib/utils';
+import type { Task } from '../types';
 
-import './tasks-focus.css';
+import './task-history-refresh.css';
 
-type StatusFilter = 'pendientes' | 'todas' | 'completadas';
-type DateFilter = 'todas' | 'vencidas' | 'hoy' | 'proximas';
-type PriorityFilter = 'todas' | Task['priority'];
+type TaskGroup = 'vencidas' | 'hoy' | 'proximas' | 'sin-fecha' | 'completadas';
+type View = 'pendientes' | TaskGroup;
+type Priority = 'todas' | Task['priority'];
 
-const priorityOrder: Record<Task['priority'], number> = {
+type GroupConfig = {
+  id: TaskGroup;
+  title: string;
+  explanation: string;
+};
+
+const GROUPS: GroupConfig[] = [
+  { id: 'vencidas', title: 'Vencidas', explanation: 'Requieren atención primero' },
+  { id: 'hoy', title: 'Para hoy', explanation: 'Lo que toca resolver ahora' },
+  { id: 'proximas', title: 'Próximas', explanation: 'Compromisos de los siguientes días' },
+  { id: 'sin-fecha', title: 'Sin fecha', explanation: 'Pendientes de planificación' },
+  { id: 'completadas', title: 'Completadas', explanation: 'Tareas que ya resolviste' },
+];
+
+const PRIORITY_ORDER: Record<Task['priority'], number> = {
   alta: 0,
   media: 1,
   baja: 2,
 };
 
-function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('es-AR')
-    .trim();
+const clean = (text: string) =>
+  text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+function groupOf(task: Task, today: string): TaskGroup {
+  if (task.done) return 'completadas';
+  if (!task.dueDate) return 'sin-fecha';
+  if (task.dueDate < today) return 'vencidas';
+  if (task.dueDate === today) return 'hoy';
+  return 'proximas';
+}
+
+function byDateAndPriority(a: Task, b: Task): number {
+  const dates = (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31');
+  return dates || PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || a.title.localeCompare(b.title, 'es-AR');
 }
 
 interface TasksProps {
   onAdd: () => void;
-  onEdit: (item: Task) => void;
+  onEdit: (task: Task) => void;
 }
 
 export function Tasks({ onAdd, onEdit }: TasksProps) {
   const { data, toggleTask, notify } = useCRM();
-
-  const [status, setStatus] = useState<StatusFilter>('pendientes');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('todas');
-  const [priority, setPriority] = useState<PriorityFilter>('todas');
+  const [view, setView] = useState<View>('pendientes');
+  const [priority, setPriority] = useState<Priority>('todas');
   const [search, setSearch] = useState('');
-
   const today = toDateInput(new Date());
 
-  const pending = data.tasks.filter((task) => !task.done).length;
-  const late = data.tasks.filter(
-    (task) => !task.done && Boolean(task.dueDate) && task.dueDate < today,
-  ).length;
-  const dueToday = data.tasks.filter(
-    (task) => !task.done && task.dueDate === today,
-  ).length;
-  const upcoming = data.tasks.filter(
-    (task) => !task.done && Boolean(task.dueDate) && task.dueDate > today,
-  ).length;
-  const completed = data.tasks.length - pending;
-  const statusCount = status === 'completadas'
-    ? completed
-    : status === 'todas'
-      ? data.tasks.length
-      : pending;
+  const counts = useMemo(() => {
+    const summary: Record<TaskGroup, number> = {
+      vencidas: 0,
+      hoy: 0,
+      proximas: 0,
+      'sin-fecha': 0,
+      completadas: 0,
+    };
 
-  const list = useMemo(() => {
-    const query = normalize(search);
+    for (const task of data.tasks) summary[groupOf(task, today)]++;
+    return summary;
+  }, [data.tasks, today]);
 
-    return data.tasks
-      .filter((task) => {
-        if (status === 'pendientes' && task.done) return false;
-        if (status === 'completadas' && !task.done) return false;
-        if (priority !== 'todas' && task.priority !== priority) return false;
+  const pending = data.tasks.length - counts.completadas;
+  const attention = counts.vencidas + counts.hoy;
 
-        if (dateFilter !== 'todas') {
-          // Los filtros de vencimiento se refieren a tareas pendientes.
-          if (task.done || !task.dueDate) return false;
-          if (dateFilter === 'vencidas' && task.dueDate >= today) return false;
-          if (dateFilter === 'hoy' && task.dueDate !== today) return false;
-          if (dateFilter === 'proximas' && task.dueDate <= today) return false;
-        }
+  const matching = useMemo(() => {
+    const query = clean(search);
 
-        const deal = data.deals.find((item) => item.id === task.dealId);
-        const company = data.companies.find((item) => item.id === deal?.companyId);
-        const text = normalize(
-          [task.title, task.description, deal?.title ?? '', company?.name ?? '', deal?.owner ?? ''].join(' '),
-        );
+    return data.tasks.filter((task) => {
+      if (priority !== 'todas' && task.priority !== priority) return false;
 
-        return text.includes(query);
-      })
-      .sort((a, b) => {
-        if (a.done !== b.done) return Number(a.done) - Number(b.done);
+      const group = groupOf(task, today);
+      if (view === 'pendientes' && group === 'completadas') return false;
+      if (view !== 'pendientes' && group !== view) return false;
 
-        // Sin fecha siempre al final, sin alterar los datos originales.
-        const aDate = a.dueDate || '9999-12-31';
-        const bDate = b.dueDate || '9999-12-31';
-        const byDate = aDate.localeCompare(bDate);
-        if (byDate !== 0) return byDate;
+      if (!query) return true;
 
-        const byPriority = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (byPriority !== 0) return byPriority;
+      const deal = data.deals.find((item) => item.id === task.dealId);
+      const company = data.companies.find((item) => item.id === deal?.companyId);
+      const searchable = clean([
+        task.title,
+        task.description,
+        deal?.title ?? '',
+        company?.name ?? '',
+        deal?.owner ?? '',
+      ].join(' '));
+      return searchable.includes(query);
+    });
+  }, [data.tasks, data.deals, data.companies, priority, view, search, today]);
 
-        return a.title.localeCompare(b.title, 'es-AR');
-      });
-  }, [data.tasks, data.deals, data.companies, search, status, dateFilter, priority, today]);
-
-  const setUrgencyFilter = (next: DateFilter) => {
-    setDateFilter(next);
-    if (next !== 'todas') setStatus('pendientes');
-  };
+  const groups = useMemo(
+    () => GROUPS
+      .filter((group) => view === 'pendientes' ? group.id !== 'completadas' : group.id === view)
+      .map((group) => ({
+        ...group,
+        tasks: matching.filter((task) => groupOf(task, today) === group.id).sort(byDateAndPriority),
+      }))
+      .filter((group) => group.tasks.length > 0),
+    [matching, view, today],
+  );
 
   const exportCsv = () => {
     csvDownload('nexo-tareas.csv', [
-      ['Tarea', 'Descripción', 'Prioridad', 'Estado', 'Vencimiento', 'Oportunidad', 'Empresa'],
-      ...list.map((task) => {
+      ['Tarea', 'Descripción', 'Prioridad', 'Estado', 'Vencimiento', 'Oportunidad', 'Cliente'],
+      ...matching.map((task) => {
         const deal = data.deals.find((item) => item.id === task.dealId);
         const company = data.companies.find((item) => item.id === deal?.companyId);
         return [
@@ -139,82 +138,77 @@ export function Tasks({ onAdd, onEdit }: TasksProps) {
         ];
       }),
     ]);
-    notify('Tareas exportadas a CSV');
+    notify('Lista de tareas exportada a CSV.');
+  };
+
+  const resetFilters = () => {
+    setView('pendientes');
+    setPriority('todas');
+    setSearch('');
   };
 
   return (
-    <>
+    <div className="nexo-simple-page">
       <PageHeading
-        eyebrow="PRODUCTIVIDAD / SEGUIMIENTO"
-        title="Tareas y seguimientos"
-        subtitle="Lo más importante de un CRM: saber qué tenés que hacer después."
+        eyebrow="PRODUCTIVIDAD / TAREAS"
+        title="Tareas"
+        subtitle="Primero lo urgente. Marcá lo que resolviste y organizá lo que sigue."
         action={
           <button type="button" className="btn btn-primary" onClick={onAdd}>
-            <Plus size={16} />
-            Nueva tarea
+            <Plus size={16} /> Nueva tarea
           </button>
         }
       />
 
-      <div className="tasks-stat-grid">
+      <section className="nexo-task-overview" aria-label="Situación de tus tareas">
+        <div className="nexo-task-overview-icon"><CalendarDays size={21} /></div>
         <div>
-          <Clock3 size={19} />
-          <strong>{pending}</strong>
-          <span>Pendientes</span>
+          <span className="nexo-simple-eyebrow">TU AGENDA DE TRABAJO</span>
+          <h2>{attention > 0 ? `${attention} tarea${attention === 1 ? '' : 's'} requiere${attention === 1 ? '' : 'n'} atención` : 'No tenés tareas urgentes'}</h2>
+          <p>{counts.vencidas} vencidas · {counts.hoy} para hoy · {pending} pendientes en total</p>
         </div>
-        <div>
-          <CalendarDays size={19} />
-          <strong>{late}</strong>
-          <span>Vencidas</span>
-        </div>
-        <div>
-          <CheckCheck size={19} />
-          <strong>{completed}</strong>
-          <span>Completadas</span>
-        </div>
-      </div>
+      </section>
 
-      <div className="panel full-panel">
-        <div className="toolbar">
-          <div className="search-field">
-            <Search size={17} />
+      <section className="nexo-task-navigation" aria-label="Mostrar tareas por estado">
+        {([
+          ['pendientes', 'Pendientes', pending],
+          ['vencidas', 'Vencidas', counts.vencidas],
+          ['hoy', 'Hoy', counts.hoy],
+          ['proximas', 'Próximas', counts.proximas],
+          ['sin-fecha', 'Sin fecha', counts['sin-fecha']],
+          ['completadas', 'Completadas', counts.completadas],
+        ] as const).map(([id, label, count]) => (
+          <button
+            key={id}
+            type="button"
+            className={`nexo-task-tab ${view === id ? 'selected' : ''} ${id === 'vencidas' && count > 0 ? 'nexo-task-tab-alert' : ''}`}
+            aria-pressed={view === id}
+            onClick={() => setView(id)}
+          >
+            {label}<span>{count}</span>
+          </button>
+        ))}
+      </section>
+
+      <section className="panel nexo-simple-panel">
+        <div className="nexo-simple-toolbar">
+          <label className="nexo-simple-search">
+            <Search size={16} />
             <input
-              placeholder="Buscar tarea, oportunidad o empresa..."
-              aria-label="Buscar tareas"
+              type="search"
               value={search}
+              aria-label="Buscar tareas"
+              placeholder="Buscar tarea, cliente o negocio..."
               onChange={(event) => setSearch(event.target.value)}
             />
-          </div>
-
-          <div className="toolbar-right tasks-toolbar-right">
-            <div className="tab-row" aria-label="Estado de las tareas">
-              {(['pendientes', 'todas', 'completadas'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={status === item ? 'active' : ''}
-                  aria-pressed={status === item}
-                  onClick={() => {
-                    setStatus(item);
-                    if (item === 'completadas') setDateFilter('todas');
-                  }}
-                >
-                  {item === 'pendientes'
-                    ? 'Pendientes'
-                    : item === 'todas'
-                      ? 'Todas'
-                      : 'Completadas'}
-                </button>
-              ))}
-            </div>
-
-            <label className="tasks-priority-select">
-              <SlidersHorizontal size={14} />
+          </label>
+          <div className="nexo-simple-actions">
+            <label className="nexo-simple-select">
+              <SlidersHorizontal size={15} />
               <select
-                className="select-filter"
-                aria-label="Filtrar por prioridad"
+                aria-label="Filtrar prioridad"
                 value={priority}
-                onChange={(event) => setPriority(event.target.value as PriorityFilter)}
+                onChange={(event) => setPriority(event.target.value as Priority)}
               >
                 <option value="todas">Todas las prioridades</option>
                 <option value="alta">Alta</option>
@@ -222,113 +216,90 @@ export function Tasks({ onAdd, onEdit }: TasksProps) {
                 <option value="baja">Baja</option>
               </select>
             </label>
-
             <button type="button" className="btn btn-outline" onClick={exportCsv}>
-              <Download size={15} />
-              CSV
+              <Download size={15} /> Exportar CSV
             </button>
           </div>
         </div>
 
-        <div className="tasks-date-filters" aria-label="Filtrar por vencimiento">
-          <span className="tasks-filter-label">VENCIMIENTO</span>
-          {([
-            ['todas', 'Sin filtro', statusCount],
-            ['vencidas', 'Vencidas', late],
-            ['hoy', 'Para hoy', dueToday],
-            ['proximas', 'Próximas', upcoming],
-          ] as const).map(([id, label, count]) => (
-            <button
-              key={id}
-              type="button"
-              className={`tasks-filter-button ${dateFilter === id ? 'active' : ''} ${id === 'vencidas' && count > 0 ? 'urgent' : ''}`}
-              aria-pressed={dateFilter === id}
-              onClick={() => setUrgencyFilter(id)}
-            >
-              {label} <span>{count}</span>
-            </button>
-          ))}
+        <div className="nexo-simple-result-count" role="status">
+          Mostrando {matching.length} tarea{matching.length === 1 ? '' : 's'}
+          {view === 'completadas' ? ' completadas' : ' según tu selección'}
         </div>
 
-        <div className="task-list">
-          {list.map((task) => {
-            const isLate = !task.done && overdue(task.dueDate);
-            const isToday = !task.done && todayDue(task.dueDate);
-            const deal = data.deals.find((item) => item.id === task.dealId);
-            const company = data.companies.find((item) => item.id === deal?.companyId);
+        {groups.length > 0 ? (
+          <div className="nexo-task-groups">
+            {groups.map((group) => (
+              <section className="nexo-task-group" key={group.id} aria-label={group.title}>
+                <header className="nexo-task-group-heading">
+                  <div>
+                    <h2>{group.title}<span>{group.tasks.length}</span></h2>
+                    <p>{group.explanation}</p>
+                  </div>
+                </header>
 
-            return (
-              <div
-                className={`task-row ${task.done ? 'task-done' : ''} ${isLate ? 'tasks-row-late' : ''}`}
-                key={task.id}
-              >
-                <label
-                  className="task-check"
-                  title={task.done ? 'Marcar pendiente' : 'Completar tarea'}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`${task.done ? 'Reabrir' : 'Completar'} tarea: ${task.title}`}
-                    checked={task.done}
-                    onChange={() => toggleTask(task.id)}
-                  />
-                  <span className="check-control">
-                    <CircleCheckBig size={18} />
-                  </span>
-                </label>
-
-                <button type="button" className="task-body" onClick={() => onEdit(task)}>
-                  <strong>{task.title}</strong>
-                  <span>{task.description || 'Sin descripción'}</span>
-                  {deal && (
-                    <span className="tasks-related-deal">
-                      Oportunidad: <b>{deal.title}</b>
-                      {company && <> · {company.name}</>}
-                    </span>
-                  )}
-                </button>
-
-                <div className="task-row-right">
-                  <Tag tone={task.priority === 'alta' ? 'red' : task.priority === 'media' ? 'purple' : 'neutral'}>
-                    {task.priority === 'alta' ? 'Alta' : task.priority === 'media' ? 'Media' : 'Baja'}
-                  </Tag>
-
-                  <span className={`task-date ${isLate ? 'danger-text' : ''} ${isToday ? 'today-text' : ''}`}>
-                    <CalendarDays size={14} />
-                    {isLate ? 'Vencida · ' : isToday ? 'Hoy · ' : ''}
-                    {fmtDate(task.dueDate)}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="icon-btn small"
-                    title={`Editar ${task.title}`}
-                    aria-label={`Editar tarea ${task.title}`}
-                    onClick={() => onEdit(task)}
-                  >
-                    <ClipboardCheck size={16} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {!list.length && (
-          <Empty
-            title="No hay tareas para este filtro"
-            detail="Probá otra búsqueda, prioridad o vencimiento, o creá una tarea nueva."
-            onAction={onAdd}
-            action="Crear tarea"
-          />
+                {group.tasks.map((task) => {
+                  const deal = data.deals.find((item) => item.id === task.dealId);
+                  const company = data.companies.find((item) => item.id === deal?.companyId);
+                  return (
+                    <div className={`nexo-task-item ${task.done ? 'is-done' : ''}`} key={task.id}>
+                      <label className="nexo-task-complete" title={task.done ? 'Reabrir tarea' : 'Completar tarea'}>
+                        <input
+                          type="checkbox"
+                          checked={task.done}
+                          aria-label={`${task.done ? 'Reabrir' : 'Completar'} tarea: ${task.title}`}
+                          onChange={() => toggleTask(task.id)}
+                        />
+                        <CheckCircle2 size={20} aria-hidden="true" />
+                      </label>
+                      <button type="button" className="nexo-task-info" onClick={() => onEdit(task)}>
+                        <strong>{task.title}</strong>
+                        <small>
+                          {company?.name || deal?.title || 'Tarea general'}
+                          {company && deal ? ` · ${deal.title}` : ''}
+                        </small>
+                        {task.description && <span>{task.description}</span>}
+                      </button>
+                      <div className="nexo-task-meta">
+                        <Tag tone={task.priority === 'alta' ? 'red' : task.priority === 'media' ? 'purple' : 'neutral'}>
+                          {task.priority === 'alta' ? 'Alta' : task.priority === 'media' ? 'Media' : 'Baja'}
+                        </Tag>
+                        <span className={`nexo-task-due ${group.id === 'vencidas' ? 'late' : ''}`}>
+                          <Clock3 size={13} />
+                          {task.dueDate ? fmtDate(task.dueDate) : 'Sin fecha'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="nexo-simple-empty">
+            {data.tasks.length === 0 ? (
+              <Empty
+                title="Todavía no hay tareas"
+                detail="Creá tu primera tarea para empezar a organizar el trabajo."
+                onAction={onAdd}
+                action="Crear tarea"
+              />
+            ) : (
+              <>
+                <CheckCircle2 size={26} />
+                <strong>No hay tareas en esta vista</strong>
+                <p>Probá otro estado, prioridad o búsqueda.</p>
+                <button type="button" className="btn btn-outline" onClick={resetFilters}>Ver mis pendientes</button>
+              </>
+            )}
+          </div>
         )}
-      </div>
+      </section>
 
-      <div className="hint-row tasks-hint">
-        <CalendarDays size={15} />
-        Las tareas se ordenan por fecha de vencimiento y, en la misma fecha, por prioridad.
-        Las tareas sin fecha aparecen al final.
-      </div>
-    </>
+      <p className="nexo-simple-footnote">
+        <CheckCircle2 size={15} /> Marcá una tarea para completarla. Tocá su nombre para editarla.
+        Las tareas se relacionan con un negocio solo cuando les asignás una oportunidad.
+      </p>
+    </div>
   );
 }
