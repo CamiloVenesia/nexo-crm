@@ -1,27 +1,19 @@
 
 import type { CRMData } from '../types';
+
 import { assertData } from './utils';
+
+import {
+  validateFinancialData,
+} from './currencyExchange';
 
 export const STORAGE_KEY = 'nexo-crm-v1';
 
-type StorageReader = Pick<Storage, 'getItem'>;
-type StorageWriter = Pick<Storage, 'setItem'>;
+type StorageReader =
+  Pick<Storage, 'getItem'>;
 
-function validateExchangeRate(data: CRMData): void {
-  const rate = data.settings.exchangeRate;
-
-  if (
-    rate !== undefined &&
-    (
-      typeof rate !== 'number' ||
-      !Number.isFinite(rate) ||
-      rate <= 0 ||
-      rate > 1_000_000_000
-    )
-  ) {
-    throw new Error('Cotización guardada inválida');
-  }
-}
+type StorageWriter =
+  Pick<Storage, 'setItem'>;
 
 export type LoadResult =
   | {
@@ -45,19 +37,20 @@ export type LoadResult =
       message: string;
     };
 
-/**
- * Lee los registros sin modificarlos.
- *
- * Un almacenamiento corrupto nunca se
- * reemplaza automáticamente por la demo.
- */
+// ============================================
+// LECTURA SEGURA
+// ============================================
+
 export function readCRMStorage(
-  getStorage: () => StorageReader = () => window.localStorage,
+  getStorage: () => StorageReader =
+    () => window.localStorage,
 ): LoadResult {
   let raw: string | null;
 
   try {
-    raw = getStorage().getItem(STORAGE_KEY);
+    raw = getStorage().getItem(
+      STORAGE_KEY,
+    );
   } catch {
     return {
       status: 'unavailable',
@@ -77,10 +70,12 @@ export function readCRMStorage(
   }
 
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown =
+      JSON.parse(raw);
+
     const data = assertData(parsed);
 
-    validateExchangeRate(data);
+    validateFinancialData(data);
 
     return {
       status: 'valid',
@@ -100,23 +95,27 @@ export function readCRMStorage(
   }
 }
 
-/**
- * Devuelve null cuando la escritura se completa.
- * Si falla, devuelve un mensaje que puede mostrarse
- * al usuario.
- */
+// ============================================
+// GUARDADO SEGURO
+// ============================================
+
 export function writeCRMStorage(
   data: CRMData,
-  getStorage: () => StorageWriter = () => window.localStorage,
+  getStorage: () => StorageWriter =
+    () => window.localStorage,
 ): string | null {
   try {
     const validData = assertData(data);
 
-    validateExchangeRate(validData);
+    validateFinancialData(validData);
 
-    const serialized = JSON.stringify(validData);
+    const serialized =
+      JSON.stringify(validData);
 
-    getStorage().setItem(STORAGE_KEY, serialized);
+    getStorage().setItem(
+      STORAGE_KEY,
+      serialized,
+    );
 
     return null;
   } catch {

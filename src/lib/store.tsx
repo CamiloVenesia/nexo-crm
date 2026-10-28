@@ -21,6 +21,11 @@ import type {
 import { createId, seedDemo } from './seed';
 
 import {
+  prepareDealAmount,
+  validateFinancialData,
+} from './currencyExchange';
+
+import {
   readCRMStorage,
   writeCRMStorage,
 } from './persistence';
@@ -66,11 +71,11 @@ interface Store {
   notify: (message: string) => void;
 }
 
-const StoreContext = createContext<Store | null>(
-  null,
-);
+const StoreContext =
+  createContext<Store | null>(null);
 
-const dateNow = () => new Date().toISOString();
+const dateNow = () =>
+  new Date().toISOString();
 
 const historyItem = (
   type: ActivityType,
@@ -84,22 +89,18 @@ const historyItem = (
   createdAt: dateNow(),
 });
 
+// ============================================
+// PROVIDER
+// ============================================
+
 export function CRMProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // ============================================
-  // CARGA INICIAL SEGURA
-  // ============================================
-
-  /*
-    Primero leemos y validamos los datos.
-
-    Si encontramos información corrupta,
-    mostramos la demo sin sobrescribir
-    el almacenamiento original.
-  */
+  // ==========================================
+  // CARGA INICIAL PROTEGIDA
+  // ==========================================
 
   const [loaded] = useState(readCRMStorage);
 
@@ -114,13 +115,12 @@ export function CRMProvider({
     loaded.status !== 'invalid',
   );
 
-  const [storageIssue, setStorageIssue] = useState(
-    loaded.message ?? '',
-  );
+  const [storageIssue, setStorageIssue] =
+    useState(loaded.message ?? '');
 
-  // ============================================
-  // GUARDADO SEGURO
-  // ============================================
+  // ==========================================
+  // GUARDADO LOCAL PROTEGIDO
+  // ==========================================
 
   useEffect(() => {
     if (!canPersist) return;
@@ -128,33 +128,38 @@ export function CRMProvider({
     const error = writeCRMStorage(data);
 
     setStorageIssue(
-      (current) => error ?? (current ? '' : current),
+      (current) =>
+        error ?? (current ? '' : current),
     );
   }, [data, canPersist]);
 
-  // ============================================
+  // ==========================================
   // NOTIFICACIONES
-  // ============================================
+  // ==========================================
 
   useEffect(() => {
     if (!notification) return;
 
-    const timer = window.setTimeout(() => {
-      setNotification('');
-    }, 3500);
+    const timer = window.setTimeout(
+      () => setNotification(''),
+      3500,
+    );
 
     return () => {
       window.clearTimeout(timer);
     };
   }, [notification]);
 
-  const notify = useCallback((message: string) => {
-    setNotification(message);
-  }, []);
+  const notify = useCallback(
+    (message: string) => {
+      setNotification(message);
+    },
+    [],
+  );
 
-  // ============================================
-  // CREAR O ACTUALIZAR REGISTROS
-  // ============================================
+  // ==========================================
+  // ACTUALIZAR REGISTROS
+  // ==========================================
 
   const update = useCallback(
     (
@@ -181,7 +186,6 @@ export function CRMProvider({
 
         return {
           ...previous,
-
           [collection]: updated,
 
           activities: [
@@ -192,7 +196,6 @@ export function CRMProvider({
                 : 'Nuevo registro',
               description,
             ),
-
             ...previous.activities,
           ].slice(0, 150),
         };
@@ -203,25 +206,39 @@ export function CRMProvider({
     [notify],
   );
 
-  // ============================================
-  // OPORTUNIDADES
-  // ============================================
+  // ==========================================
+  // OPORTUNIDADES — IMPORTE BASE ARS
+  // ==========================================
 
   const upsertDeal = useCallback(
     (value: Deal) => {
+      const previous = data.deals.find(
+        (deal) => deal.id === value.id,
+      );
+
+      // Preparamos el importe antes de guardarlo.
+      // No confiamos en amountBaseARS que pueda
+      // venir de un formulario modificado.
+
+      const prepared = prepareDealAmount(
+        value,
+        previous,
+        data,
+      );
+
       update(
         'deals',
-        value,
-        value.title,
+        prepared,
+        prepared.title,
         'deal',
       );
     },
-    [update],
+    [data, update],
   );
 
-  // ============================================
+  // ==========================================
   // CONTACTOS
-  // ============================================
+  // ==========================================
 
   const upsertContact = useCallback(
     (value: Contact) => {
@@ -235,9 +252,9 @@ export function CRMProvider({
     [update],
   );
 
-  // ============================================
+  // ==========================================
   // EMPRESAS
-  // ============================================
+  // ==========================================
 
   const upsertCompany = useCallback(
     (value: Company) => {
@@ -251,9 +268,9 @@ export function CRMProvider({
     [update],
   );
 
-  // ============================================
+  // ==========================================
   // TAREAS
-  // ============================================
+  // ==========================================
 
   const upsertTask = useCallback(
     (value: Task) => {
@@ -267,9 +284,9 @@ export function CRMProvider({
     [update],
   );
 
-  // ============================================
-  // ELIMINACIÓN CON INTEGRIDAD REFERENCIAL
-  // ============================================
+  // ==========================================
+  // ELIMINACIÓN CON INTEGRIDAD
+  // ==========================================
 
   const removeEntity = useCallback(
     (
@@ -310,7 +327,6 @@ export function CRMProvider({
               'Registro eliminado',
               currentResult.title,
             ),
-
             ...currentResult.data.activities,
           ].slice(0, 150),
         };
@@ -365,9 +381,9 @@ export function CRMProvider({
     [removeEntity],
   );
 
-  // ============================================
+  // ==========================================
   // CAMBIAR ETAPA
-  // ============================================
+  // ==========================================
 
   const changeStage = useCallback(
     (
@@ -429,16 +445,13 @@ export function CRMProvider({
           activities: [
             historyItem(
               'deal',
-
               stage === 'ganado'
                 ? 'Venta ganada'
                 : stage === 'perdido'
                   ? 'Oportunidad perdida'
                   : 'Etapa actualizada',
-
               old.title,
             ),
-
             ...previous.activities,
           ].slice(0, 150),
         };
@@ -451,9 +464,9 @@ export function CRMProvider({
     [data.deals, notify],
   );
 
-  // ============================================
-  // COMPLETAR O REABRIR TAREAS
-  // ============================================
+  // ==========================================
+  // COMPLETAR O REABRIR TAREA
+  // ==========================================
 
   const toggleTask = useCallback(
     (id: string) => {
@@ -482,14 +495,11 @@ export function CRMProvider({
         activities: [
           historyItem(
             'task',
-
             task.done
               ? 'Tarea reabierta'
               : 'Tarea completada',
-
             task.title,
           ),
-
           ...previous.activities,
         ].slice(0, 150),
       }));
@@ -497,9 +507,9 @@ export function CRMProvider({
     [data.tasks, notify],
   );
 
-  // ============================================
+  // ==========================================
   // CONFIGURACIÓN
-  // ============================================
+  // ==========================================
 
   const updateSettings = useCallback(
     (value: Settings) => {
@@ -515,20 +525,20 @@ export function CRMProvider({
     [notify],
   );
 
-  // ============================================
+  // ==========================================
   // RESTAURAR RESPALDO
-  // ============================================
+  // ==========================================
 
   const restore = useCallback(
     (value: CRMData) => {
       try {
         const validated = assertData(value);
 
-        setData(validated);
+        // También validamos las nuevas
+        // referencias monetarias.
+        validateFinancialData(validated);
 
-        // Una restauración explícita permite
-        // recuperar el almacenamiento bloqueado
-        // por datos corruptos anteriores.
+        setData(validated);
         setCanPersist(true);
         setStorageIssue('');
 
@@ -544,16 +554,12 @@ export function CRMProvider({
     [notify],
   );
 
-  // ============================================
+  // ==========================================
   // REINICIAR DEMO
-  // ============================================
+  // ==========================================
 
   const reset = useCallback(() => {
     setData(seedDemo());
-
-    // El reinicio es una acción explícita.
-    // Se habilita el reemplazo de los datos
-    // locales cuando corresponde.
     setCanPersist(true);
     setStorageIssue('');
 
@@ -562,9 +568,9 @@ export function CRMProvider({
     );
   }, [notify]);
 
-  // ============================================
+  // ==========================================
   // CONTEXTO
-  // ============================================
+  // ==========================================
 
   const store = useMemo(
     () => ({
@@ -619,9 +625,9 @@ export function CRMProvider({
     ],
   );
 
-  // ============================================
-  // INTERFAZ Y AVISO DE ALMACENAMIENTO
-  // ============================================
+  // ==========================================
+  // AVISO DE FALLO DE ALMACENAMIENTO
+  // ==========================================
 
   return (
     <StoreContext.Provider value={store}>
@@ -663,7 +669,7 @@ export function CRMProvider({
 }
 
 // ============================================
-// HOOK DEL CRM
+// HOOK
 // ============================================
 
 export function useCRM() {
