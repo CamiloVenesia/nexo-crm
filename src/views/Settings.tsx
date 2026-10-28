@@ -8,25 +8,26 @@ import {
   Download,
   FileJson2,
   FileUp,
+  RefreshCw,
   RotateCcw,
   Save,
   ShieldCheck,
   UserRoundCog,
   X,
-  RefreshCw,
 } from 'lucide-react';
 
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { PageHeading, SectionTitle } from '../components/Shared';
 import { useCRM } from '../lib/store';
 
 import {
   applyExchangeRate,
   fetchDollarQuote,
   getAppliedExchangeRate,
+  validateFinancialData,
 } from '../lib/currencyExchange';
 
-import type {
-  ExchangeSource,
-} from '../lib/currencyExchange';
+import type { ExchangeSource } from '../lib/currencyExchange';
 
 import {
   MAX_PREFERENCE_LENGTH,
@@ -35,20 +36,8 @@ import {
   validatePreferences,
 } from '../lib/settingsSafety';
 
-import {
-  assertData,
-  downloadJSON,
-} from '../lib/utils';
-
-import type {
-  CRMData,
-  Settings as WorkspaceSettings,
-} from '../types';
-
-import {
-  PageHeading,
-  SectionTitle,
-} from '../components/Shared';
+import { assertData, downloadJSON } from '../lib/utils';
+import type { CRMData, Settings as WorkspaceSettings } from '../types';
 
 import './settings-safety.css';
 
@@ -57,24 +46,22 @@ type BackupPreview = {
   data: CRMData;
 };
 
-function moneyPrecise(
+const formatMoney = (
   value: number,
   currency: 'ARS' | 'USD',
-) {
-  return new Intl.NumberFormat('es-AR', {
+) =>
+  new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-}
 
-function fxNumber(rate: number) {
-  return new Intl.NumberFormat('es-AR', {
+const formatRate = (value: number) =>
+  new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(rate);
-}
+  }).format(value);
 
 export function Settings() {
   const crm = useCRM();
@@ -82,13 +69,8 @@ export function Settings() {
 
   const appliedRate = getAppliedExchangeRate(data);
 
-  const [org, setOrg] = useState(
-    data.settings.organization,
-  );
-
-  const [name, setName] = useState(
-    data.settings.userName,
-  );
+  const [org, setOrg] = useState(data.settings.organization);
+  const [name, setName] = useState(data.settings.userName);
 
   const [currency, setCurrency] = useState<
     WorkspaceSettings['currency']
@@ -107,10 +89,15 @@ export function Settings() {
   const [success, setSuccess] = useState('');
 
   const [backupError, setBackupError] = useState('');
+
   const [preview, setPreview] =
     useState<BackupPreview | null>(null);
 
   const [readingFile, setReadingFile] = useState(false);
+
+  const [confirmRestoreOpen, setConfirmRestoreOpen] =
+    useState(false);
+
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPhrase, setResetPhrase] = useState('');
 
@@ -118,7 +105,7 @@ export function Settings() {
   const readSequence = useRef(0);
 
   // ============================================
-  // SINCRONIZAR PREFERENCIAS GUARDADAS
+  // SINCRONIZAR PREFERENCIAS
   // ============================================
 
   useEffect(() => {
@@ -129,6 +116,7 @@ export function Settings() {
     const rate = getAppliedExchangeRate(data);
 
     setRateInput(rate === null ? '' : String(rate));
+
     setRateSource(
       data.settings.exchangeRateSource ?? 'manual',
     );
@@ -138,13 +126,11 @@ export function Settings() {
     );
 
     setPreferencesError('');
-  }, [data]);
-
-  const currentRateText =
-    appliedRate === null ? '' : String(appliedRate);
+  }, [data.settings]);
 
   const rateChanged =
-    rateInput.trim() !== currentRateText;
+    rateInput.trim() !==
+    (appliedRate === null ? '' : String(appliedRate));
 
   const currencyChanged =
     currency !== data.settings.currency;
@@ -185,32 +171,30 @@ export function Settings() {
   if (
     firstDeal &&
     rateValid &&
-    (currencyChanged || rateChanged)
+    (rateChanged || currencyChanged)
   ) {
-    const previousRate =
-      data.settings.currency === 'ARS'
-        ? 1
-        : appliedRate;
+    const previousBase =
+      firstDeal.amountBaseARS ??
+      (data.settings.currency === 'ARS'
+        ? firstDeal.amount
+        : appliedRate !== null
+          ? firstDeal.amount * appliedRate
+          : null);
 
-    if (previousRate !== null) {
-      const baseARS =
-        data.settings.currency === 'ARS'
-          ? firstDeal.amount
-          : firstDeal.amount * previousRate;
-
+    if (previousBase !== null) {
       const newAmount =
         currency === 'ARS'
-          ? baseARS
-          : baseARS / enteredRate;
+          ? previousBase
+          : previousBase / enteredRate;
 
       if (Number.isFinite(newAmount)) {
         example = {
-          before: moneyPrecise(
+          before: formatMoney(
             firstDeal.amount,
             data.settings.currency,
           ),
 
-          after: moneyPrecise(
+          after: formatMoney(
             Math.round(newAmount * 100) / 100,
             currency,
           ),
@@ -220,7 +204,7 @@ export function Settings() {
   }
 
   // ============================================
-  // CONSULTAR COTIZACIÓN OFICIAL (OPCIONAL)
+  // CONSULTAR COTIZACIÓN OFICIAL
   // ============================================
 
   const consultOfficialRate = async () => {
@@ -248,7 +232,7 @@ export function Settings() {
   };
 
   // ============================================
-  // GUARDAR PREFERENCIAS Y COTIZACIÓN
+  // GUARDAR PREFERENCIAS
   // ============================================
 
   const savePreferences = (
@@ -271,20 +255,16 @@ export function Settings() {
       return;
     }
 
-    // La cotización o la moneda cambiaron.
-    // Recalcular importes sin abrir alertas.
-
     if (rateChanged || currencyChanged) {
       if (!rateValid) {
         setPreferencesError(
-          'Ingresá un valor válido para el dólar: por ejemplo 1560.50, sin separador de miles.',
+          'Ingresá una cotización válida, por ejemplo 1560.50, sin separador de miles.',
         );
         return;
       }
 
       try {
-        const timestamp =
-          new Date().toISOString();
+        const timestamp = new Date().toISOString();
 
         const converted = applyExchangeRate(
           data,
@@ -292,7 +272,6 @@ export function Settings() {
           enteredRate,
           rateSource,
           timestamp,
-
           rateSource === 'oficial' && officialDate
             ? officialDate
             : timestamp,
@@ -300,20 +279,16 @@ export function Settings() {
 
         crm.restore({
           ...converted,
-
           settings: {
             ...converted.settings,
-            organization:
-              result.value.organization,
-            userName:
-              result.value.userName,
+            ...result.value,
           },
         });
 
         setPreferencesError('');
 
         setSuccess(
-          'Cotización y preferencias guardadas. Los importes ya están actualizados.',
+          'Cotización y preferencias guardadas. Importes actualizados.',
         );
       } catch (error) {
         setPreferencesError(
@@ -325,9 +300,6 @@ export function Settings() {
 
       return;
     }
-
-    // Solo cambiaron organización o usuario.
-    // Conservamos los metadatos de cotización.
 
     if (hasUnsavedChanges) {
       crm.updateSettings({
@@ -345,7 +317,10 @@ export function Settings() {
     setOrg(data.settings.organization);
     setName(data.settings.userName);
     setCurrency(data.settings.currency);
-    setRateInput(currentRateText);
+
+    setRateInput(
+      appliedRate === null ? '' : String(appliedRate),
+    );
 
     setRateSource(
       data.settings.exchangeRateSource ?? 'manual',
@@ -369,10 +344,10 @@ export function Settings() {
     const sequence = ++readSequence.current;
 
     setPreview(null);
+    setConfirmRestoreOpen(false);
     setBackupError('');
 
-    const validationError =
-      validateBackupFile(file);
+    const validationError = validateBackupFile(file);
 
     if (validationError) {
       setBackupError(validationError);
@@ -403,9 +378,13 @@ export function Settings() {
         );
       }
 
+      const validData = assertData(parsed);
+
+      validateFinancialData(validData);
+
       setPreview({
         name: file.name,
-        data: assertData(parsed),
+        data: validData,
       });
     } catch (error) {
       if (sequence === readSequence.current) {
@@ -426,10 +405,15 @@ export function Settings() {
     }
   };
 
+  // ============================================
+  // CANCELAR IMPORTACIÓN
+  // ============================================
+
   const cancelPreview = () => {
     ++readSequence.current;
 
     setPreview(null);
+    setConfirmRestoreOpen(false);
     setBackupError('');
     setReadingFile(false);
 
@@ -438,24 +422,37 @@ export function Settings() {
     }
   };
 
-  const applyBackup = () => {
-    if (!preview) return;
+  // ============================================
+  // CONFIRMAR RESTAURACIÓN
+  // ============================================
 
-    if (
-      !window.confirm(
-        `¿Reemplazar todos los datos actuales por "${preview.name}"? ` +
-        'Esto también restaurará la moneda y la cotización que tenga ese respaldo.',
-      )
-    ) {
+  const applyBackup = () => {
+    if (!preview) {
+      setConfirmRestoreOpen(false);
       return;
     }
 
-    crm.restore(preview.data);
+    try {
+      const validData = assertData(preview.data);
 
-    cancelPreview();
-    setResetOpen(false);
-    setResetPhrase('');
-    setSuccess('');
+      validateFinancialData(validData);
+
+      crm.restore(validData);
+
+      cancelPreview();
+
+      setResetOpen(false);
+      setResetPhrase('');
+      setSuccess('');
+    } catch (error) {
+      setBackupError(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo restaurar el respaldo.',
+      );
+
+      setConfirmRestoreOpen(false);
+    }
   };
 
   // ============================================
@@ -472,6 +469,7 @@ export function Settings() {
     crm.reset();
 
     setPreview(null);
+    setConfirmRestoreOpen(false);
     setBackupError('');
     setReadingFile(false);
     setResetOpen(false);
@@ -492,9 +490,7 @@ export function Settings() {
       />
 
       <div className="settings-grid">
-        {/* =====================================
-            PREFERENCIAS GENERALES
-        ===================================== */}
+        {/* PREFERENCIAS GENERALES */}
 
         <div className="panel setting-panel">
           <SectionTitle
@@ -605,9 +601,7 @@ export function Settings() {
                   type="button"
                   className="btn btn-outline"
                   disabled={quoteLoading}
-                  onClick={() =>
-                    void consultOfficialRate()
-                  }
+                  onClick={() => void consultOfficialRate()}
                 >
                   <RefreshCw size={15} />
 
@@ -618,17 +612,15 @@ export function Settings() {
               </div>
 
               <small>
-                Podés escribir o modificar la
-                cotización cuando quieras. El botón
-                «Consultar oficial» solo carga un
-                valor de referencia; no aplica
-                ningún cambio hasta que guardes.
+                Podés modificar la cotización manualmente.
+                «Consultar oficial» solo carga un valor de
+                referencia; no aplica cambios hasta que guardes.
               </small>
 
               {appliedRate !== null && (
                 <small>
                   Cotización aplicada: 1 USD ={' '}
-                  {fxNumber(appliedRate)} ARS.
+                  {formatRate(appliedRate)} ARS.
 
                   {data.settings.exchangeRateUpdatedAt && (
                     <>
@@ -644,16 +636,15 @@ export function Settings() {
               {data.settings.currency === 'USD' &&
                 appliedRate === null && (
                   <p className="settings-unsaved">
-                    No se encontró la cotización
-                    anterior de estos importes en USD.
+                    No encontramos la cotización anterior.
                     Para evitar cifras incorrectas,
-                    no se podrán recalcular hasta
-                    recuperar un respaldo original en ARS.
+                    recuperá un respaldo original en ARS
+                    antes de recalcular.
                   </p>
                 )}
             </div>
 
-            {/* VISTA PREVIA SIN ALERTAS */}
+            {/* VISTA PREVIA DE CONVERSIÓN */}
 
             {(rateChanged || currencyChanged) && (
               <div
@@ -664,7 +655,7 @@ export function Settings() {
 
                 <p style={{ margin: '6px 0 0' }}>
                   {rateValid
-                    ? `Nueva cotización: 1 USD = ${fxNumber(
+                    ? `Nueva cotización: 1 USD = ${formatRate(
                         enteredRate,
                       )} ARS.`
                     : 'Ingresá una cotización válida para ver el resultado.'}
@@ -679,10 +670,9 @@ export function Settings() {
                 )}
 
                 <p style={{ margin: '6px 0 0' }}>
-                  Se actualizarán los importes de
-                  las oportunidades al guardar.
-                  Si están en ARS y seguís en ARS,
-                  los importes no cambian.
+                  Los importes se actualizarán al guardar.
+                  Si mantenés ARS, modificar la cotización
+                  no altera los importes en pesos.
                 </p>
               </div>
             )}
@@ -738,9 +728,7 @@ export function Settings() {
           </form>
         </div>
 
-        {/* =====================================
-            DATOS Y RESPALDOS
-        ===================================== */}
+        {/* DATOS Y RESPALDOS */}
 
         <div className="panel setting-panel">
           <SectionTitle
@@ -756,10 +744,9 @@ export function Settings() {
               <strong>Demo local, sin servidor</strong>
 
               <p>
-                Los datos se guardan en este
-                navegador. No existe sincronización
-                entre dispositivos ni una copia
-                automática en la nube.
+                Los datos se guardan en este navegador.
+                No existe sincronización entre dispositivos
+                ni una copia automática en la nube.
               </p>
             </div>
           </div>
@@ -794,24 +781,22 @@ export function Settings() {
             </span>
           </div>
 
-          {/* DESCARGAR RESPALDO */}
+          {/* EXPORTAR RESPALDO */}
 
           <div className="setting-action">
             <div>
               <strong>Descargar respaldo</strong>
 
               <p>
-                Incluye registros, moneda y
-                cotización aplicada en un archivo JSON.
+                Incluye registros, moneda y cotización
+                aplicada en un archivo JSON.
               </p>
             </div>
 
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() =>
-                downloadJSON(data)
-              }
+              onClick={() => downloadJSON(data)}
             >
               <Download size={15} />
               Exportar JSON
@@ -825,9 +810,8 @@ export function Settings() {
               <strong>Restaurar respaldo</strong>
 
               <p>
-                Importá un JSON de NEXO CRM
-                (máximo 3 MB) y revisalo antes
-                de reemplazar datos.
+                Importá un JSON de NEXO CRM (máximo 3 MB)
+                y revisalo antes de reemplazar datos.
               </p>
             </div>
 
@@ -848,9 +832,7 @@ export function Settings() {
               type="button"
               className="btn btn-outline"
               disabled={readingFile}
-              onClick={() =>
-                picker.current?.click()
-              }
+              onClick={() => picker.current?.click()}
             >
               <FileUp size={15} />
 
@@ -928,9 +910,7 @@ export function Settings() {
                 </div>
 
                 <div>
-                  <small>
-                    RESPALDO SELECCIONADO
-                  </small>
+                  <small>RESPALDO SELECCIONADO</small>
 
                   <strong>
                     {preview.data.settings.organization}
@@ -967,15 +947,18 @@ export function Settings() {
 
               <p className="settings-preview-warning">
                 <AlertTriangle size={15} />
-                Al importar se reemplazan
-                también la moneda y la cotización.
+
+                Al restaurar se reemplazarán también
+                la moneda y la cotización.
               </p>
 
               <div className="settings-buttons">
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={applyBackup}
+                  onClick={() =>
+                    setConfirmRestoreOpen(true)
+                  }
                 >
                   <FileUp size={15} />
                   Confirmar reemplazo
@@ -999,9 +982,8 @@ export function Settings() {
               <strong>Reiniciar demo</strong>
 
               <p>
-                Recupera los datos originales
-                en ARS. Se perderán los cambios
-                no exportados.
+                Recupera los datos originales en ARS.
+                Se perderán los cambios no exportados.
               </p>
             </div>
 
@@ -1009,10 +991,7 @@ export function Settings() {
               type="button"
               className="btn btn-danger-subtle"
               onClick={() => {
-                setResetOpen(
-                  (value) => !value,
-                );
-
+                setResetOpen((value) => !value);
                 setResetPhrase('');
               }}
             >
@@ -1033,8 +1012,8 @@ export function Settings() {
 
               <p>
                 Exportá un respaldo si necesitás
-                conservar los cambios. Escribí{' '}
-                <strong>REINICIAR</strong>.
+                conservar los cambios.
+                Escribí <strong>REINICIAR</strong>.
               </p>
 
               <label htmlFor="settings-reset-phrase">
@@ -1047,9 +1026,7 @@ export function Settings() {
                 autoComplete="off"
                 placeholder="REINICIAR"
                 onChange={(event) =>
-                  setResetPhrase(
-                    event.target.value,
-                  )
+                  setResetPhrase(event.target.value)
                 }
               />
 
@@ -1082,7 +1059,7 @@ export function Settings() {
         </div>
       </div>
 
-      {/* AVISO SOBRE LA DEMO */}
+      {/* AVISO SOBRE LA VERSIÓN DEMO */}
 
       <div className="settings-disclaimer">
         <FileJson2 size={20} />
@@ -1103,6 +1080,30 @@ export function Settings() {
           </p>
         </div>
       </div>
+
+      {/* DIÁLOGO PROFESIONAL PARA RESTAURAR */}
+
+      {confirmRestoreOpen && preview && (
+        <ConfirmDialog
+          tone="danger"
+          title="¿Restaurar este respaldo?"
+          description={
+            `Vas a reemplazar los datos de ${data.settings.organization} por el respaldo «${preview.name}» ` +
+            `de ${preview.data.settings.organization}.\n\n` +
+            `Actual: ${currentCounts.deals} oportunidades, ${currentCounts.contacts} contactos, ` +
+            `${currentCounts.companies} empresas y ${currentCounts.tasks} tareas.\n` +
+            `Respaldo: ${preview.data.deals.length} oportunidades, ${preview.data.contacts.length} contactos, ` +
+            `${preview.data.companies.length} empresas y ${preview.data.tasks.length} tareas.\n\n` +
+            'También se reemplazarán la moneda y la cotización. No se combinarán los registros ' +
+            'ni podrás deshacer el cambio sin otro respaldo.'
+          }
+          confirmLabel="Restaurar respaldo"
+          onConfirm={applyBackup}
+          onCancel={() =>
+            setConfirmRestoreOpen(false)
+          }
+        />
+      )}
     </>
   );
 }
