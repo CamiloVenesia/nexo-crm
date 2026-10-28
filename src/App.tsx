@@ -28,6 +28,7 @@ import { EditorModal, Editing } from './components/EditorModal';
 
 import { CRMProvider, useCRM } from './lib/store';
 import { downloadJSON, overdue } from './lib/utils';
+import { searchCRM } from './lib/search';
 import { Page } from './types';
 
 import { Dashboard } from './views/Dashboard';
@@ -78,7 +79,7 @@ const nav: {
   },
   {
     id: 'insights',
-    label: 'Insights',
+    label: 'Reportes',
     icon: Sparkles,
   },
 ];
@@ -171,84 +172,52 @@ function WorkSpace() {
     .filter((task) => !task.done && overdue(task.dueDate))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
+  // Una sola búsqueda para todo NEXO: tildes, empresas,
+  // contactos, responsables, notas y tareas vinculadas.
   const matches = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return [];
-    }
-
-    return [
-      ...data.deals
-        .filter((deal) => deal.title.toLowerCase().includes(query))
-        .map((deal) => ({
-          key: `d${deal.id}`,
-          label: deal.title,
-          sub: 'Oportunidad',
-          action: () => {
+    return searchCRM(data, search, 8).flatMap((result) => {
+      const open = (): void => {
+        switch (result.kind) {
+          case 'deal': {
+            const value = data.deals.find((deal) => deal.id === result.id);
+            if (!value) return;
             navigate('deals');
-
-            setEditing({
-              kind: 'deal',
-              value: deal,
-            });
-          },
-        })),
-
-      ...data.contacts
-        .filter((contact) =>
-          `${contact.name} ${contact.email}`
-            .toLowerCase()
-            .includes(query),
-        )
-        .map((contact) => ({
-          key: `p${contact.id}`,
-          label: contact.name,
-          sub: 'Contacto',
-          action: () => {
+            setEditing({ kind: 'deal', value });
+            break;
+          }
+          case 'contact': {
+            const value = data.contacts.find((item) => item.id === result.id);
+            if (!value) return;
             navigate('contacts');
-
-            setEditing({
-              kind: 'contact',
-              value: contact,
-            });
-          },
-        })),
-
-      ...data.companies
-        .filter((company) =>
-          company.name.toLowerCase().includes(query),
-        )
-        .map((company) => ({
-          key: `c${company.id}`,
-          label: company.name,
-          sub: 'Empresa',
-          action: () => {
+            setEditing({ kind: 'contact', value });
+            break;
+          }
+          case 'company': {
+            const value = data.companies.find((item) => item.id === result.id);
+            if (!value) return;
             navigate('companies');
-
-            setEditing({
-              kind: 'company',
-              value: company,
-            });
-          },
-        })),
-
-      ...data.tasks
-        .filter((task) => task.title.toLowerCase().includes(query))
-        .map((task) => ({
-          key: `t${task.id}`,
-          label: task.title,
-          sub: 'Tarea',
-          action: () => {
+            setEditing({ kind: 'company', value });
+            break;
+          }
+          case 'task': {
+            const value = data.tasks.find((item) => item.id === result.id);
+            if (!value) return;
             navigate('tasks');
+            setEditing({ kind: 'task', value });
+            break;
+          }
+        }
+        setSearch('');
+        setSearchOpen(false);
+      };
 
-            setEditing({
-              kind: 'task',
-              value: task,
-            });
-          },
-        })),
-    ].slice(0, 8);
+      return [{
+        key: `${result.kind}-${result.id}`,
+        label: result.title,
+        sub: result.detail,
+        action: open,
+      }];
+    });
   }, [search, data]);
 
   const edit = (item: Editing) => {
@@ -261,6 +230,7 @@ function WorkSpace() {
         <button
           key={id}
           className={`nav-link ${page === id ? 'active' : ''}`}
+          aria-current={page === id ? 'page' : undefined}
           onClick={() => navigate(id)}
         >
           <Icon size={16} />
@@ -307,6 +277,14 @@ function WorkSpace() {
                 ref={searchRef}
                 placeholder="Buscar en NEXO..."
                 aria-label="Búsqueda global"
+                aria-expanded={searchOpen && search.trim().length >= 2}
+                aria-controls="nexo-global-search-results"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && matches[0]) {
+                    event.preventDefault();
+                    matches[0].action();
+                  }
+                }}
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -315,10 +293,15 @@ function WorkSpace() {
                 onFocus={() => setSearchOpen(true)}
               />
 
-              <kbd>⌘ K</kbd>
+              <kbd>Ctrl K</kbd>
 
-              {searchOpen && search && (
-                <div className="search-dropdown">
+              {searchOpen && search.trim().length >= 2 && (
+                <div
+                  id="nexo-global-search-results"
+                  className="search-dropdown"
+                  role="region"
+                  aria-label="Resultados de búsqueda"
+                >
                   <div className="dropdown-label">
                     RESULTADOS DE BÚSQUEDA
                   </div>
@@ -327,6 +310,7 @@ function WorkSpace() {
                     matches.map((match) => (
                       <button
                         key={match.key}
+                        type="button"
                         onMouseDown={(event) =>
                           event.preventDefault()
                         }

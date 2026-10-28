@@ -78,7 +78,9 @@ export function money(
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0,
+    // Conservar centavos USD al mostrar importes completos.
+    // En indicadores compactos, un decimal es suficiente.
+    maximumFractionDigits: currency === 'USD' ? (compact ? 1 : 2) : 0,
     notation: compact ? 'compact' : 'standard',
     compactDisplay: 'short',
   }).format(amount);

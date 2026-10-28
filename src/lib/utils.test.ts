@@ -75,6 +75,11 @@ describe('NEXO CRM / cálculos', () => {
       money(15500, 'ARS'),
     ).toContain('15.500');
   });
+
+  it('conserva los centavos al mostrar importes en dólares', () => {
+    expect(money(6.41, 'USD')).toContain('6,41');
+    expect(money(1534.1, 'USD')).toContain('1.534,1');
+  });
 });
 
 // ==================================================
