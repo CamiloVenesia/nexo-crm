@@ -317,16 +317,19 @@
   font-size: 12px;
 }
 
+
 .nexo-home-activity small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   color: #afbedb;
   font-size: 11px;
   line-height: 1.5;
   margin-top: 3px;
 }
+
 
 .nexo-home-activity div > span {
   display: block;
