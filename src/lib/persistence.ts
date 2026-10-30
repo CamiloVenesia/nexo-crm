@@ -1,5 +1,8 @@
 
-import type { CRMData } from '../types';
+import type {
+  CRMData,
+  Settings,
+} from '../types';
 
 import { assertData } from './utils';
 
@@ -8,6 +11,7 @@ import {
 } from './currencyExchange';
 
 export const STORAGE_KEY = 'nexo-crm-v1';
+export const SETTINGS_STORAGE_PREFIX = 'nexo-crm-settings-v1:';
 
 type StorageReader =
   Pick<Storage, 'getItem'>;
@@ -37,20 +41,21 @@ export type LoadResult =
       message: string;
     };
 
+function browserStorage(): StorageReader & StorageWriter {
+  return window.localStorage;
+}
+
 // ============================================
-// LECTURA SEGURA
+// LECTURA SEGURA DE DATOS LOCALES
 // ============================================
 
 export function readCRMStorage(
-  getStorage: () => StorageReader =
-    () => window.localStorage,
+  getStorage: () => StorageReader = browserStorage,
 ): LoadResult {
   let raw: string | null;
 
   try {
-    raw = getStorage().getItem(
-      STORAGE_KEY,
-    );
+    raw = getStorage().getItem(STORAGE_KEY);
   } catch {
     return {
       status: 'unavailable',
@@ -70,9 +75,7 @@ export function readCRMStorage(
   }
 
   try {
-    const parsed: unknown =
-      JSON.parse(raw);
-
+    const parsed: unknown = JSON.parse(raw);
     const data = assertData(parsed);
 
     validateFinancialData(data);
@@ -96,25 +99,20 @@ export function readCRMStorage(
 }
 
 // ============================================
-// GUARDADO SEGURO
+// GUARDADO SEGURO DE DATOS LOCALES
 // ============================================
 
 export function writeCRMStorage(
   data: CRMData,
-  getStorage: () => StorageWriter =
-    () => window.localStorage,
+  getStorage: () => StorageWriter = browserStorage,
 ): string | null {
   try {
     const validData = assertData(data);
-
     validateFinancialData(validData);
-
-    const serialized =
-      JSON.stringify(validData);
 
     getStorage().setItem(
       STORAGE_KEY,
-      serialized,
+      JSON.stringify(validData),
     );
 
     return null;
@@ -123,6 +121,103 @@ export function writeCRMStorage(
       'No se pudieron guardar los cambios en este navegador ' +
       '(almacenamiento bloqueado o sin espacio). ' +
       'Exportá un respaldo JSON antes de cerrar la pestaña.'
+    );
+  }
+}
+
+// ============================================
+// PREFERENCIAS LOCALES POR ORGANIZACIÓN
+// ============================================
+
+function settingsKey(organizationId: string) {
+  return `${SETTINGS_STORAGE_PREFIX}${organizationId}`;
+}
+
+function isSettings(value: unknown): value is Settings {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+
+  const settings = value as Record<string, unknown>;
+
+  if (
+    typeof settings.organization !== 'string' ||
+    typeof settings.userName !== 'string' ||
+    (settings.currency !== 'ARS' &&
+      settings.currency !== 'USD')
+  ) {
+    return false;
+  }
+
+  if (
+    settings.exchangeRate !== undefined &&
+    (typeof settings.exchangeRate !== 'number' ||
+      !Number.isFinite(settings.exchangeRate) ||
+      settings.exchangeRate <= 0)
+  ) {
+    return false;
+  }
+
+  if (
+    settings.exchangeRateSource !== undefined &&
+    settings.exchangeRateSource !== 'manual' &&
+    settings.exchangeRateSource !== 'oficial'
+  ) {
+    return false;
+  }
+
+  if (
+    settings.exchangeRateUpdatedAt !== undefined &&
+    typeof settings.exchangeRateUpdatedAt !== 'string'
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function readCRMSettings(
+  organizationId: string,
+  getStorage: () => StorageReader = browserStorage,
+): Settings | null {
+  try {
+    const raw = getStorage().getItem(
+      settingsKey(organizationId),
+    );
+
+    if (!raw) return null;
+
+    const parsed: unknown = JSON.parse(raw);
+
+    return isSettings(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeCRMSettings(
+  organizationId: string,
+  settings: Settings,
+  getStorage: () => StorageWriter = browserStorage,
+): string | null {
+  try {
+    if (!isSettings(settings)) {
+      throw new Error('Preferencias inválidas.');
+    }
+
+    getStorage().setItem(
+      settingsKey(organizationId),
+      JSON.stringify(settings),
+    );
+
+    return null;
+  } catch {
+    return (
+      'No se pudieron guardar las preferencias en este navegador.'
     );
   }
 }

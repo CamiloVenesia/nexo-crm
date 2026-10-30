@@ -1,7 +1,7 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-
+import type { Session } from '@supabase/supabase-js';
 import {
   ArrowRight,
   Building2,
@@ -11,164 +11,211 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import type { Session } from '@supabase/supabase-js';
-
 import App from '../App';
 import { supabase } from '../lib/supabase';
-
+import { WorkspaceProvider } from '../lib/workspace';
 import './auth-gate.css';
 
-type Mode =
-  | 'login'
-  | 'register'
-  | 'forgot'
-  | 'change-password';
+type Mode = 'login' | 'register' | 'forgot' | 'change-password';
+type Access = 'loading' | 'guest' | 'no-workspace' | 'ready' | 'error';
+type Role = 'admin' | 'member';
 
-type Access =
-  | 'loading'
-  | 'guest'
-  | 'no-workspace'
-  | 'ready'
-  | 'error';
+function withTimeout<T>(
+  request: PromiseLike<T>,
+  milliseconds = 12000,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(
+        'Supabase no respondió a tiempo. Revisá la conexión y reintentá.',
+      ));
+    }, milliseconds);
+
+    Promise.resolve(request).then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (cause) => {
+        window.clearTimeout(timer);
+        reject(cause);
+      },
+    );
+  });
+}
+
+function getError(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Se produjo un error inesperado.';
+}
 
 export function AuthGate() {
-  const [session, setSession] =
-    useState<Session | null>(null);
-
+  const [session, setSession] = useState<Session | null>(null);
   const [access, setAccess] = useState<Access>(
     supabase ? 'loading' : 'ready',
   );
-
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [organization, setOrganization] = useState('');
-
-  const [role, setRole] =
-    useState<'admin' | 'member' | null>(null);
-
+  const [organizationId, setOrganizationId] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [role, setRole] = useState<Role | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+  const activeUserId = useRef<string | null>(null);
 
   // ==========================================
-  // SESIÓN
+  // SESIÓN DE SUPABASE
   // ==========================================
 
   useEffect(() => {
     if (!supabase) return;
 
-    const client = supabase;
-    let mounted = true;
-
-    client.auth
-      .getSession()
-      .then(({ data, error: authError }) => {
-        if (!mounted) return;
-
-        if (authError) {
-          setError(authError.message);
-          setAccess('guest');
-        } else {
-          setSession(data.session);
-
-          if (!data.session) {
-            setAccess('guest');
-          }
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setError(
-            'No se pudo comprobar la sesión. Revisá la conexión.',
-          );
-          setAccess('guest');
-        }
-      });
+    let active = true;
+    let initialized = false;
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange(
-      (event, nextSession) => {
-        if (!mounted) return;
+    } = supabase.auth.onAuthStateChange((event, next) => {
+      if (!active) return;
 
-        if (event === 'PASSWORD_RECOVERY') {
-          setMode('change-password');
-        }
+      initialized = true;
 
-        setSession(nextSession);
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('change-password');
+      }
 
-        if (!nextSession) {
-          setRole(null);
-          setAccess('guest');
-        }
-      },
-    );
+      const nextId = next?.user.id ?? null;
+      const userChanged = activeUserId.current !== nextId;
+
+      activeUserId.current = nextId;
+      setSession(next);
+
+      if (!nextId) {
+        setOrganizationId('');
+        setOrganizationName('');
+        setRole(null);
+        setAccess('guest');
+      } else if (userChanged) {
+        setAccess('loading');
+      }
+    });
+
+    const timer = window.setTimeout(() => {
+      if (!active || initialized) return;
+
+      setError(
+        'No se pudo comprobar la sesión con Supabase.',
+      );
+      setAccess('error');
+    }, 12000);
 
     return () => {
-      mounted = false;
+      active = false;
+      window.clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
 
   // ==========================================
-  // COMPROBAR MEMBRESÍA
+  // ORGANIZACIÓN ACTIVA
   // ==========================================
 
   useEffect(() => {
     if (!supabase || !session?.user.id) return;
 
     const client = supabase;
+    const userId = session.user.id;
     let active = true;
 
     setAccess('loading');
+    setError('');
+    setRole(null);
+    setOrganizationId('');
+    setOrganizationName('');
 
-    client
-      .from('organization_members')
-      .select('organization_id, role')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error: queryError }) => {
+    async function loadMembership() {
+      try {
+        const {
+          data: membership,
+          error: membershipError,
+        } = await withTimeout(
+          client
+            .from('organization_members')
+            .select('organization_id, role, joined_at')
+            .eq('user_id', userId)
+            .order('joined_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+        );
+
         if (!active) return;
 
-        if (queryError) {
-          setError(
-            'No se pudo consultar tu equipo: ' +
-              queryError.message,
-          );
+        if (membershipError) throw membershipError;
 
-          setAccess('error');
-        } else if (!data) {
+        if (!membership) {
           setAccess('no-workspace');
-        } else {
-          setRole(
-            data.role === 'admin'
-              ? 'admin'
-              : 'member',
-          );
-
-          setAccess('ready');
+          return;
         }
-      });
+
+        const {
+          data: org,
+          error: orgError,
+        } = await withTimeout(
+          client
+            .from('organizations')
+            .select('id, name')
+            .eq('id', membership.organization_id)
+            .maybeSingle(),
+        );
+
+        if (!active) return;
+
+        if (orgError) throw orgError;
+
+        if (!org) {
+          throw new Error(
+            'No se encontró tu espacio de trabajo.',
+          );
+        }
+
+        setOrganizationId(org.id);
+        setOrganizationName(org.name);
+        setRole(
+          membership.role === 'admin'
+            ? 'admin'
+            : 'member',
+        );
+        setAccess('ready');
+      } catch (cause) {
+        if (!active) return;
+
+        setError(
+          `No se pudo consultar tu equipo: ${getError(cause)}`,
+        );
+        setAccess('error');
+      }
+    }
+
+    void loadMembership();
 
     return () => {
       active = false;
     };
   }, [session?.user.id, retry]);
 
-  // Sin credenciales, mantiene la demo local.
-  if (!supabase) {
-    return <App />;
-  }
+  if (!supabase) return <App />;
 
   const client = supabase;
-
   const returnUrl =
     window.location.origin + window.location.pathname;
 
   // ==========================================
-  // REGISTRO / LOGIN / CONTRASEÑA
+  // AUTENTICACIÓN
   // ==========================================
 
   async function submitAuth(
@@ -212,15 +259,13 @@ export function AuthGate() {
         const { error: authError } =
           await client.auth.resetPasswordForEmail(
             email.trim(),
-            {
-              redirectTo: returnUrl,
-            },
+            { redirectTo: returnUrl },
           );
 
         if (authError) throw authError;
 
         setMessage(
-          'Si el correo está registrado, recibirás un enlace para recuperar la contraseña.',
+          'Si el correo está registrado, recibirás un enlace de recuperación.',
         );
       } else {
         if (password.length < 8) {
@@ -230,9 +275,7 @@ export function AuthGate() {
         }
 
         const { error: authError } =
-          await client.auth.updateUser({
-            password,
-          });
+          await client.auth.updateUser({ password });
 
         if (authError) throw authError;
 
@@ -244,19 +287,15 @@ export function AuthGate() {
           'Contraseña actualizada. Iniciá sesión nuevamente.',
         );
       }
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'No se pudo completar la operación.',
-      );
+    } catch (cause) {
+      setError(getError(cause));
     } finally {
       setBusy(false);
     }
   }
 
   // ==========================================
-  // CREACIÓN DE EMPRESA
+  // CREAR ORGANIZACIÓN
   // ==========================================
 
   async function createOrganization(
@@ -270,23 +309,26 @@ export function AuthGate() {
     setError('');
 
     try {
-      const { error: rpcError } = await client.rpc(
-        'create_nexo_organization',
-        {
-          p_name: organization.trim(),
-        },
-      );
+      const { data: id, error: rpcError } =
+        await client.rpc(
+          'create_nexo_organization',
+          { p_name: organization.trim() },
+        );
 
       if (rpcError) throw rpcError;
 
+      if (typeof id !== 'string' || !id) {
+        throw new Error(
+          'No se recibió el ID de la organización. Volvé a iniciar sesión.',
+        );
+      }
+
+      setOrganizationId(id);
+      setOrganizationName(organization.trim());
       setRole('admin');
       setAccess('ready');
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'No se pudo crear la empresa.',
-      );
+    } catch (cause) {
+      setError(getError(cause));
     } finally {
       setBusy(false);
     }
@@ -305,7 +347,11 @@ export function AuthGate() {
     if (authError) {
       setError(authError.message);
     } else {
+      activeUserId.current = null;
+      setSession(null);
       setRole(null);
+      setOrganizationId('');
+      setOrganizationName('');
       setAccess('guest');
     }
   }
@@ -318,9 +364,41 @@ export function AuthGate() {
     mode !== 'change-password' &&
     access === 'ready'
   ) {
+    if (!session?.user.id || !organizationId || !role) {
+      return (
+        <main className="nexo-auth-page">
+          <div className="nexo-auth-card">
+            <h1>No se pudo identificar tu espacio</h1>
+            <p>
+              Volvé a comprobar los permisos de tu cuenta.
+            </p>
+            <button
+              className="nexo-auth-submit"
+              type="button"
+              onClick={() =>
+                setRetry(value => value + 1)
+              }
+            >
+              Reintentar
+            </button>
+          </div>
+        </main>
+      );
+    }
+
     return (
       <>
-        <App />
+        <WorkspaceProvider
+          value={{
+            organizationId,
+            organizationName,
+            userId: session.user.id,
+            userEmail: session.user.email ?? '',
+            role,
+          }}
+        >
+          <App />
+        </WorkspaceProvider>
 
         <div
           className="nexo-session-chip"
@@ -329,7 +407,7 @@ export function AuthGate() {
           <ShieldCheck size={14} />
 
           <span>
-            {session?.user.email}
+            {session.user.email}
             {' · '}
             {role === 'admin'
               ? 'Administrador'
@@ -388,7 +466,12 @@ export function AuthGate() {
               type="button"
               onClick={() => {
                 setError('');
-                setRetry((value) => value + 1);
+
+                if (session?.user.id) {
+                  setRetry(value => value + 1);
+                } else {
+                  window.location.reload();
+                }
               }}
             >
               Reintentar
@@ -420,7 +503,7 @@ export function AuthGate() {
             </p>
 
             <form
-              onSubmit={(event) =>
+              onSubmit={event =>
                 void createOrganization(event)
               }
             >
@@ -434,7 +517,7 @@ export function AuthGate() {
                 maxLength={80}
                 minLength={2}
                 required
-                onChange={(event) =>
+                onChange={event =>
                   setOrganization(event.target.value)
                 }
                 placeholder="Ej. Estudio Aurora"
@@ -485,7 +568,7 @@ export function AuthGate() {
             </p>
 
             <form
-              onSubmit={(event) =>
+              onSubmit={event =>
                 void submitAuth(event)
               }
             >
@@ -502,7 +585,7 @@ export function AuthGate() {
                     autoComplete="email"
                     required
                     value={email}
-                    onChange={(event) =>
+                    onChange={event =>
                       setEmail(event.target.value)
                     }
                     placeholder="vos@empresa.com"
@@ -514,7 +597,6 @@ export function AuthGate() {
                 <>
                   <label htmlFor="nexo-password">
                     <LockKeyhole size={14} />
-
                     {mode === 'change-password'
                       ? 'Nueva contraseña'
                       : 'Contraseña'}
@@ -531,7 +613,7 @@ export function AuthGate() {
                         : 'new-password'
                     }
                     value={password}
-                    onChange={(event) =>
+                    onChange={event =>
                       setPassword(event.target.value)
                     }
                   />
@@ -612,8 +694,7 @@ export function AuthGate() {
         )}
 
         <small className="nexo-auth-footnote">
-          NEXO CRM · Acceso protegido con
-          Supabase Auth
+          NEXO CRM · Acceso protegido con Supabase Auth
         </small>
       </div>
     </main>
