@@ -16,8 +16,19 @@ import { supabase } from '../lib/supabase';
 import { WorkspaceProvider } from '../lib/workspace';
 import './auth-gate.css';
 
-type Mode = 'login' | 'register' | 'forgot' | 'change-password';
-type Access = 'loading' | 'guest' | 'no-workspace' | 'ready' | 'error';
+type Mode =
+  | 'login'
+  | 'register'
+  | 'forgot'
+  | 'change-password';
+
+type Access =
+  | 'loading'
+  | 'guest'
+  | 'no-workspace'
+  | 'ready'
+  | 'error';
+
 type Role = 'admin' | 'member';
 
 function withTimeout<T>(
@@ -32,11 +43,11 @@ function withTimeout<T>(
     }, milliseconds);
 
     Promise.resolve(request).then(
-      (value) => {
+      value => {
         window.clearTimeout(timer);
         resolve(value);
       },
-      (cause) => {
+      cause => {
         window.clearTimeout(timer);
         reject(cause);
       },
@@ -51,10 +62,13 @@ function getError(error: unknown): string {
 }
 
 export function AuthGate() {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] =
+    useState<Session | null>(null);
+
   const [access, setAccess] = useState<Access>(
     supabase ? 'loading' : 'ready',
   );
+
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -66,10 +80,11 @@ export function AuthGate() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+
   const activeUserId = useRef<string | null>(null);
 
   // ==========================================
-  // SESIÓN DE SUPABASE
+  // SESIÓN
   // ==========================================
 
   useEffect(() => {
@@ -80,30 +95,33 @@ export function AuthGate() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, next) => {
-      if (!active) return;
+    } = supabase.auth.onAuthStateChange(
+      (event, next) => {
+        if (!active) return;
 
-      initialized = true;
+        initialized = true;
 
-      if (event === 'PASSWORD_RECOVERY') {
-        setMode('change-password');
-      }
+        if (event === 'PASSWORD_RECOVERY') {
+          setMode('change-password');
+        }
 
-      const nextId = next?.user.id ?? null;
-      const userChanged = activeUserId.current !== nextId;
+        const nextId = next?.user.id ?? null;
+        const userChanged =
+          activeUserId.current !== nextId;
 
-      activeUserId.current = nextId;
-      setSession(next);
+        activeUserId.current = nextId;
+        setSession(next);
 
-      if (!nextId) {
-        setOrganizationId('');
-        setOrganizationName('');
-        setRole(null);
-        setAccess('guest');
-      } else if (userChanged) {
-        setAccess('loading');
-      }
-    });
+        if (!nextId) {
+          setOrganizationId('');
+          setOrganizationName('');
+          setRole(null);
+          setAccess('guest');
+        } else if (userChanged) {
+          setAccess('loading');
+        }
+      },
+    );
 
     const timer = window.setTimeout(() => {
       if (!active || initialized) return;
@@ -111,6 +129,7 @@ export function AuthGate() {
       setError(
         'No se pudo comprobar la sesión con Supabase.',
       );
+
       setAccess('error');
     }, 12000);
 
@@ -122,7 +141,7 @@ export function AuthGate() {
   }, []);
 
   // ==========================================
-  // ORGANIZACIÓN ACTIVA
+  // COMPROBAR MEMBRESÍA
   // ==========================================
 
   useEffect(() => {
@@ -185,11 +204,13 @@ export function AuthGate() {
 
         setOrganizationId(org.id);
         setOrganizationName(org.name);
+
         setRole(
           membership.role === 'admin'
             ? 'admin'
             : 'member',
         );
+
         setAccess('ready');
       } catch (cause) {
         if (!active) return;
@@ -197,6 +218,7 @@ export function AuthGate() {
         setError(
           `No se pudo consultar tu equipo: ${getError(cause)}`,
         );
+
         setAccess('error');
       }
     }
@@ -211,11 +233,20 @@ export function AuthGate() {
   if (!supabase) return <App />;
 
   const client = supabase;
+
+  const inviteToken = new URLSearchParams(
+    window.location.search,
+  ).get('invite');
+
   const returnUrl =
-    window.location.origin + window.location.pathname;
+    window.location.origin +
+    window.location.pathname +
+    (inviteToken
+      ? `?invite=${encodeURIComponent(inviteToken)}`
+      : '');
 
   // ==========================================
-  // AUTENTICACIÓN
+  // LOGIN, REGISTRO Y CONTRASEÑA
   // ==========================================
 
   async function submitAuth(
@@ -259,7 +290,9 @@ export function AuthGate() {
         const { error: authError } =
           await client.auth.resetPasswordForEmail(
             email.trim(),
-            { redirectTo: returnUrl },
+            {
+              redirectTo: returnUrl,
+            },
           );
 
         if (authError) throw authError;
@@ -275,7 +308,9 @@ export function AuthGate() {
         }
 
         const { error: authError } =
-          await client.auth.updateUser({ password });
+          await client.auth.updateUser({
+            password,
+          });
 
         if (authError) throw authError;
 
@@ -283,6 +318,7 @@ export function AuthGate() {
 
         setMode('login');
         setPassword('');
+
         setMessage(
           'Contraseña actualizada. Iniciá sesión nuevamente.',
         );
@@ -309,11 +345,15 @@ export function AuthGate() {
     setError('');
 
     try {
-      const { data: id, error: rpcError } =
-        await client.rpc(
-          'create_nexo_organization',
-          { p_name: organization.trim() },
-        );
+      const {
+        data: id,
+        error: rpcError,
+      } = await client.rpc(
+        'create_nexo_organization',
+        {
+          p_name: organization.trim(),
+        },
+      );
 
       if (rpcError) throw rpcError;
 
@@ -327,6 +367,55 @@ export function AuthGate() {
       setOrganizationName(organization.trim());
       setRole('admin');
       setAccess('ready');
+    } catch (cause) {
+      setError(getError(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ==========================================
+  // ACEPTAR INVITACIÓN
+  // ==========================================
+
+  async function acceptInvitation() {
+    if (!inviteToken || busy) return;
+
+    const validToken =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        inviteToken,
+      );
+
+    if (!validToken) {
+      setError(
+        'El enlace de invitación no es válido.',
+      );
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const { error: rpcError } =
+        await client.rpc('nexo_accept_invite', {
+          p_token: inviteToken,
+        });
+
+      if (rpcError) throw rpcError;
+
+      const url = new URL(window.location.href);
+
+      url.searchParams.delete('invite');
+
+      window.history.replaceState(
+        {},
+        '',
+        url.pathname + url.search + url.hash,
+      );
+
+      setMessage('Invitación aceptada.');
+      setRetry(value => value + 1);
     } catch (cause) {
       setError(getError(cause));
     } finally {
@@ -357,21 +446,30 @@ export function AuthGate() {
   }
 
   // ==========================================
-  // USUARIO AUTENTICADO
+  // USUARIO CON ORGANIZACIÓN
   // ==========================================
 
   if (
     mode !== 'change-password' &&
     access === 'ready'
   ) {
-    if (!session?.user.id || !organizationId || !role) {
+    if (
+      !session?.user.id ||
+      !organizationId ||
+      !role
+    ) {
       return (
         <main className="nexo-auth-page">
           <div className="nexo-auth-card">
-            <h1>No se pudo identificar tu espacio</h1>
+            <h1>
+              No se pudo identificar tu espacio
+            </h1>
+
             <p>
-              Volvé a comprobar los permisos de tu cuenta.
+              Volvé a comprobar los permisos
+              de tu cuenta.
             </p>
+
             <button
               className="nexo-auth-submit"
               type="button"
@@ -493,48 +591,77 @@ export function AuthGate() {
               className="nexo-auth-feature-icon"
             />
 
-            <h1>
-              Creá tu espacio de trabajo
-            </h1>
+            {inviteToken ? (
+              <>
+                <h1>Unite a tu equipo</h1>
 
-            <p>
-              Esta empresa tendrá sus propios
-              datos y usuarios autorizados.
-            </p>
+                <p>
+                  Esta invitación solo puede aceptarse
+                  con el correo confirmado al que fue
+                  enviada. Vas a entrar como Miembro.
+                </p>
 
-            <form
-              onSubmit={event =>
-                void createOrganization(event)
-              }
-            >
-              <label htmlFor="nexo-org">
-                Nombre de la empresa
-              </label>
+                <button
+                  className="nexo-auth-submit"
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void acceptInvitation()
+                  }
+                >
+                  {busy
+                    ? 'Verificando…'
+                    : 'Aceptar invitación'}
 
-              <input
-                id="nexo-org"
-                value={organization}
-                maxLength={80}
-                minLength={2}
-                required
-                onChange={event =>
-                  setOrganization(event.target.value)
-                }
-                placeholder="Ej. Estudio Aurora"
-              />
+                  <ArrowRight size={16} />
+                </button>
+              </>
+            ) : (
+              <>
+                <h1>
+                  Creá tu espacio de trabajo
+                </h1>
 
-              <button
-                className="nexo-auth-submit"
-                type="submit"
-                disabled={busy}
-              >
-                {busy
-                  ? 'Creando…'
-                  : 'Crear empresa'}
+                <p>
+                  Esta empresa tendrá sus propios
+                  datos y usuarios autorizados.
+                </p>
 
-                <ArrowRight size={16} />
-              </button>
-            </form>
+                <form
+                  onSubmit={event =>
+                    void createOrganization(event)
+                  }
+                >
+                  <label htmlFor="nexo-org">
+                    Nombre de la empresa
+                  </label>
+
+                  <input
+                    id="nexo-org"
+                    value={organization}
+                    maxLength={80}
+                    minLength={2}
+                    required
+                    onChange={event =>
+                      setOrganization(event.target.value)
+                    }
+                    placeholder="Ej. Estudio Aurora"
+                  />
+
+                  <button
+                    className="nexo-auth-submit"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {busy
+                      ? 'Creando…'
+                      : 'Crear empresa'}
+
+                    <ArrowRight size={16} />
+                  </button>
+                </form>
+              </>
+            )}
 
             <button
               className="nexo-auth-link"
@@ -564,7 +691,9 @@ export function AuthGate() {
             <p>
               {mode === 'change-password'
                 ? 'Elegí una contraseña segura para tu cuenta.'
-                : 'Tu equipo y tus clientes, en un mismo espacio.'}
+                : inviteToken
+                  ? 'Ingresá o creá una cuenta con el correo invitado para unirte al equipo.'
+                  : 'Tu equipo y tus clientes, en un mismo espacio.'}
             </p>
 
             <form
@@ -597,6 +726,7 @@ export function AuthGate() {
                 <>
                   <label htmlFor="nexo-password">
                     <LockKeyhole size={14} />
+
                     {mode === 'change-password'
                       ? 'Nueva contraseña'
                       : 'Contraseña'}
@@ -649,6 +779,7 @@ export function AuthGate() {
                         ? 'register'
                         : 'login',
                     );
+
                     setError('');
                     setMessage('');
                   }}
