@@ -1,0 +1,788 @@
+
+/* NEXO CRM — Mensajería interna */
+
+.nexo-messages-page {
+  min-width: 0;
+}
+
+.nexo-message-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #2f4162;
+  padding-bottom: 11px;
+}
+
+.nexo-message-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #aebfda;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.nexo-message-tabs button:hover {
+  background: #1b2a47;
+  color: #e9f1ff;
+}
+
+.nexo-message-tabs button.active {
+  border-color: #4266a2;
+  background: #20365d;
+  color: #edf4ff;
+}
+
+.nexo-message-tabs button > span {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #3d5f9b;
+  color: #fff;
+  font-size: 10px;
+}
+
+/* ESTRUCTURA PRINCIPAL */
+
+.nexo-chat-layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 340px) minmax(0, 1fr);
+  min-height: 620px;
+  max-height: 760px;
+  overflow: hidden;
+  border: 1px solid #34486a;
+  border-radius: 14px;
+  background: #101b33;
+}
+
+.nexo-chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid #34486a;
+  background: #111d35;
+}
+
+.nexo-chat-sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 19px 17px 14px;
+}
+
+.nexo-chat-sidebar-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.nexo-chat-sidebar-heading h2 {
+  margin: 0;
+  color: #edf3ff;
+  font-size: 16px;
+}
+
+.nexo-chat-sidebar-heading small {
+  color: #91a8ca;
+  font-size: 10px;
+}
+
+.nexo-chat-new-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid #537bc1;
+  border-radius: 9px;
+  background: #315a9d;
+  color: #fff;
+  cursor: pointer;
+}
+
+.nexo-chat-new-button:hover:not(:disabled) {
+  background: #4177c7;
+}
+
+.nexo-chat-new-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.nexo-chat-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 13px 12px;
+  padding: 9px 11px;
+  border: 1px solid #40547b;
+  border-radius: 9px;
+  background: #1a2945;
+  color: #9fb5d8;
+}
+
+.nexo-chat-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #edf3ff;
+  font-size: 12px;
+}
+
+.nexo-chat-search input::placeholder {
+  color: #8398ba;
+}
+
+.nexo-chat-conversation-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nexo-chat-conversation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 0;
+  border-top: 1px solid #293956;
+  background: transparent;
+  color: #d9e7ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nexo-chat-conversation:hover {
+  background: #1b2e51;
+}
+
+.nexo-chat-conversation.active {
+  background: #20365d;
+  box-shadow: inset 3px 0 #6398ff;
+}
+
+.nexo-chat-conversation > .avatar {
+  flex: 0 0 auto;
+}
+
+.nexo-chat-conversation-copy {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nexo-chat-conversation-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nexo-chat-conversation-topline strong {
+  overflow: hidden;
+  color: #eaf1ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nexo-chat-conversation-topline time {
+  flex: 0 0 auto;
+  color: #879fbe;
+  font-size: 9px;
+}
+
+.nexo-chat-conversation-preview {
+  overflow: hidden;
+  color: #a9bddb;
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nexo-chat-conversation-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nexo-chat-conversation-meta > span {
+  overflow: hidden;
+  color: #7f9bc2;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nexo-chat-conversation-meta b {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #477ff0;
+  color: #fff;
+  font-size: 10px;
+}
+
+.nexo-chat-sidebar-state,
+.nexo-chat-sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 24px 18px;
+  color: #94aaca;
+  text-align: center;
+  font-size: 11px;
+}
+
+.nexo-chat-sidebar-state.error {
+  color: #e8aab5;
+}
+
+.nexo-chat-sidebar-empty > svg {
+  color: #83a9ee;
+}
+
+.nexo-chat-sidebar-empty strong {
+  color: #e3edff;
+  font-size: 12px;
+}
+
+.nexo-chat-sidebar-empty p {
+  max-width: 220px;
+  margin: 0;
+  color: #91a8ca;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.nexo-chat-sidebar-empty .btn {
+  margin-top: 4px;
+}
+
+/* CONVERSACIÓN */
+
+.nexo-chat-thread {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background:
+    radial-gradient(ellipse at 50% 100%, #1d3150 0%, transparent 52%),
+    #0e192e;
+}
+
+.nexo-chat-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 75px;
+  padding: 13px 18px;
+  border-bottom: 1px solid #34486a;
+  background: #14213b;
+  flex-wrap: wrap;
+}
+
+.nexo-chat-thread-person {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 130px;
+}
+
+.nexo-chat-thread-person strong {
+  overflow: hidden;
+  color: #eff4ff;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nexo-chat-thread-person small {
+  color: #9db2d2;
+  font-size: 10px;
+}
+
+.nexo-chat-secure-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid #386b68;
+  border-radius: 999px;
+  background: #1d544a33;
+  color: #91dec9;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.nexo-chat-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid #40577c;
+  border-radius: 7px;
+  background: #1b2c49;
+  color: #b4c9e9;
+  font-size: 9px;
+}
+
+.nexo-chat-context span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nexo-chat-messages {
+  flex: 1;
+  min-height: 260px;
+  overflow-y: auto;
+  padding: 22px clamp(14px, 3vw, 34px);
+}
+
+.nexo-chat-message-state {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  color: #91a8ca;
+  font-size: 11px;
+}
+
+.nexo-chat-message-list {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  min-height: 100%;
+}
+
+.nexo-chat-date-divider {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0 15px;
+}
+
+.nexo-chat-date-divider span {
+  padding: 6px 10px;
+  border: 1px solid #354969;
+  border-radius: 999px;
+  background: #172743;
+  color: #a9bddb;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.nexo-chat-message-row {
+  display: flex;
+  width: 100%;
+  margin: 3px 0;
+}
+
+.nexo-chat-message-row.own {
+  justify-content: flex-end;
+}
+
+.nexo-chat-message-row.received {
+  justify-content: flex-start;
+}
+
+.nexo-chat-bubble {
+  max-width: min(76%, 590px);
+  padding: 10px 12px 7px;
+  border: 1px solid #3c5277;
+  border-radius: 13px 13px 13px 4px;
+  background: #1a2a48;
+  color: #e7efff;
+  box-shadow: 0 4px 14px #00000012;
+}
+
+.nexo-chat-message-row.own .nexo-chat-bubble {
+  border-color: #4169ae;
+  border-radius: 13px 13px 4px 13px;
+  background: linear-gradient(135deg, #294d83, #263b6a);
+}
+
+.nexo-chat-bubble > small {
+  display: block;
+  margin-bottom: 5px;
+  color: #a9c2ee;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.nexo-chat-bubble p {
+  margin: 0;
+  color: #eff4ff;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nexo-chat-bubble time {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 5px;
+  color: #a5b9d9;
+  font-size: 9px;
+}
+
+.nexo-chat-message-row.own .nexo-chat-bubble time svg {
+  color: #a6d9ff;
+}
+
+.nexo-chat-empty-state {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 330px;
+  padding: 30px;
+  text-align: center;
+}
+
+.nexo-chat-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 65px;
+  height: 65px;
+  border: 1px solid #42659b;
+  border-radius: 18px;
+  background: #315b9a2c;
+  color: #a9c6ff;
+}
+
+.nexo-chat-empty-state > svg {
+  color: #9bbaff;
+}
+
+.nexo-chat-empty-state h2 {
+  margin: 0;
+  color: #eaf1ff;
+  font-size: 18px;
+}
+
+.nexo-chat-empty-state p {
+  max-width: 440px;
+  margin: 0;
+  color: #a8bbd8;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.nexo-chat-empty-state > small {
+  color: #91a8ca;
+  font-size: 10px;
+}
+
+.nexo-chat-empty-state .btn {
+  margin-top: 5px;
+}
+
+.nexo-chat-message-error {
+  margin: 0 16px 8px;
+  padding: 9px 12px;
+  border: 1px solid #a85c6a;
+  border-radius: 8px;
+  background: #682c3a55;
+  color: #ffd0d8;
+  font-size: 10px;
+}
+
+/* COMPOSITOR */
+
+.nexo-chat-composer {
+  display: grid;
+  gap: 8px;
+  padding: 13px 16px 15px;
+  border-top: 1px solid #34486a;
+  background: #14213b;
+}
+
+.nexo-chat-composer textarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 150px;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid #40577e;
+  border-radius: 9px;
+  outline: 0;
+  background: #0e192e;
+  color: #edf3ff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nexo-chat-composer textarea:focus {
+  border-color: #78a4f6;
+  box-shadow: 0 0 0 3px #6798f329;
+}
+
+.nexo-chat-composer textarea::placeholder {
+  color: #8298ba;
+}
+
+.nexo-chat-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nexo-chat-composer-footer small {
+  color: #8299bb;
+  font-size: 9px;
+}
+
+.nexo-chat-composer-footer .btn {
+  min-height: 35px;
+}
+
+/* CONTACTOS EXTERNOS */
+
+.nexo-external-inbox {
+  min-height: 550px;
+}
+
+/* MODAL NUEVA CONVERSACIÓN */
+
+.nexo-message-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #050914c9;
+  backdrop-filter: blur(7px);
+}
+
+.nexo-message-modal {
+  width: min(100%, 520px);
+  max-height: min(90vh, 760px);
+  overflow: auto;
+  border: 1px solid #40547b;
+  border-radius: 15px;
+  background: #121e37;
+  color: #eaf1ff;
+  box-shadow: 0 24px 80px #0009;
+}
+
+.nexo-message-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #34486a;
+}
+
+.nexo-message-modal-header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.nexo-message-modal-header span {
+  color: #91aff0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+
+.nexo-message-modal-header h2 {
+  margin: 0;
+  color: #f0f5ff;
+  font-size: 19px;
+}
+
+.nexo-message-modal-form {
+  display: grid;
+  gap: 15px;
+  padding: 20px 22px 22px;
+}
+
+.nexo-message-modal-form label {
+  display: grid;
+  gap: 7px;
+  color: #c9d7ed;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.nexo-message-modal-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #40547b;
+  border-radius: 9px;
+  outline: 0;
+  background: #0e192f;
+  color: #eff5ff;
+  font: inherit;
+  font-size: 12px;
+}
+
+.nexo-message-modal-form select:focus {
+  border-color: #7da6ff;
+  box-shadow: 0 0 0 3px #6798f329;
+}
+
+.nexo-message-modal-divider {
+  padding-top: 5px;
+  border-top: 1px solid #34486a;
+  color: #91a8ca;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.nexo-message-modal-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #a85c6a;
+  border-radius: 8px;
+  background: #682c3a55;
+  color: #ffd0d8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.nexo-message-modal-form footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 4px;
+}
+
+/* ACCESIBILIDAD Y RESPONSIVE */
+
+.nexo-messages-page button:focus-visible,
+.nexo-messages-page a:focus-visible,
+.nexo-messages-page textarea:focus-visible,
+.nexo-messages-page select:focus-visible,
+.nexo-messages-page input:focus-visible {
+  outline: 2px solid #a5c6ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .nexo-chat-layout {
+    grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+  }
+
+  .nexo-chat-secure-label {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .nexo-chat-layout {
+    grid-template-columns: 1fr;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .nexo-chat-sidebar {
+    max-height: 300px;
+    border-right: 0;
+    border-bottom: 1px solid #34486a;
+  }
+
+  .nexo-chat-conversation-list {
+    max-height: 205px;
+  }
+
+  .nexo-chat-thread {
+    min-height: 510px;
+  }
+
+  .nexo-chat-thread-header {
+    padding: 12px;
+  }
+
+  .nexo-chat-context {
+    flex-basis: 100%;
+    margin-left: 53px;
+    width: fit-content;
+  }
+
+  .nexo-chat-bubble {
+    max-width: 88%;
+  }
+}
+
+@media (max-width: 520px) {
+  .nexo-message-tabs {
+    width: 100%;
+  }
+
+  .nexo-message-tabs button {
+    flex: 1;
+    justify-content: center;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .nexo-message-modal-backdrop {
+    align-items: end;
+    padding: 9px;
+  }
+
+  .nexo-message-modal {
+    max-height: 94vh;
+    border-radius: 15px 15px 10px 10px;
+  }
+
+  .nexo-message-modal-header,
+  .nexo-message-modal-form {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .nexo-chat-composer {
+    padding: 10px;
+  }
+
+  .nexo-chat-messages {
+    padding: 16px 10px;
+  }
+
+  .nexo-chat-empty-state {
+    padding: 20px 12px;
+  }
+
+  .nexo-inbox-thread-head {
+    flex-wrap: wrap;
+  }
+}
