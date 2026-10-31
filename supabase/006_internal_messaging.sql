@@ -471,7 +471,7 @@ BEGIN
     RAISE EXCEPTION 'No tenés acceso a esta conversación';
   END IF;
 
-  INSERT INTO public.crm_messages (
+  INSERT INTO public.crm_messages AS inserted_message (
     conversation_id,
     organization_id,
     sender_id,
@@ -483,17 +483,17 @@ BEGIN
     v_user_id,
     v_body
   )
-  RETURNING id, created_at
+  RETURNING inserted_message.id, inserted_message.created_at
   INTO v_message_id, v_created_at;
 
-  UPDATE public.crm_conversations
+  UPDATE public.crm_conversations AS conversation_to_update
   SET last_message_at = v_created_at
-  WHERE id = p_conversation_id;
+  WHERE conversation_to_update.id = p_conversation_id;
 
-  UPDATE public.crm_conversation_members
+  UPDATE public.crm_conversation_members AS member_to_update
   SET last_read_at = v_created_at
-  WHERE conversation_id = p_conversation_id
-    AND user_id = v_user_id;
+  WHERE member_to_update.conversation_id = p_conversation_id
+    AND member_to_update.user_id = v_user_id;
 
   RETURN QUERY
   SELECT m.id, m.conversation_id, m.sender_id, m.body, m.created_at
