@@ -46,6 +46,7 @@ import { supabase } from './supabase';
 import { useWorkspace } from './workspace';
 
 import {
+  applyOrganizationCurrencySettings,
   deleteCRMRecord,
   insertCRMActivity,
   loadCRMData,
@@ -198,6 +199,137 @@ function mergeActivities(
 }
 
 // ============================================
+// COMPARACIÓN DE PREFERENCIAS MONETARIAS
+// ============================================
+
+function hasCurrencySettingsChanged(
+  current: Settings,
+  next: Settings,
+): boolean {
+  return (
+    current.currency !== next.currency ||
+    (current.exchangeRate ?? null) !==
+      (next.exchangeRate ?? null) ||
+    (current.exchangeRateSource ?? null) !==
+      (next.exchangeRateSource ?? null) ||
+    (current.exchangeRateUpdatedAt ?? null) !==
+      (next.exchangeRateUpdatedAt ?? null)
+  );
+}
+
+function sameRecords<T extends { id: string }>(
+  current: T[],
+  next: T[],
+): boolean {
+  if (current.length !== next.length) return false;
+
+  const currentById = new Map(
+    current.map((record) => [record.id, record]),
+  );
+
+  return next.every((record) => {
+    const previous = currentById.get(record.id);
+
+    return (
+      previous !== undefined &&
+      JSON.stringify(previous) === JSON.stringify(record)
+    );
+  });
+}
+
+function sameDealsExceptAmounts(
+  current: Deal[],
+  next: Deal[],
+): boolean {
+  if (current.length !== next.length) return false;
+
+  const currentById = new Map(
+    current.map((deal) => [deal.id, deal]),
+  );
+
+  return next.every((deal) => {
+    const previous = currentById.get(deal.id);
+
+    if (!previous) return false;
+
+    const {
+      amount: _previousAmount,
+      amountBaseARS: _previousBase,
+      ...previousWithoutAmounts
+    } = previous;
+
+    const {
+      amount: _nextAmount,
+      amountBaseARS: _nextBase,
+      ...nextWithoutAmounts
+    } = deal;
+
+    return (
+      JSON.stringify(previousWithoutAmounts) ===
+      JSON.stringify(nextWithoutAmounts)
+    );
+  });
+}
+
+function findNewCurrencyActivity(
+  current: CRMData,
+  next: CRMData,
+) {
+  const currentIds = new Set(
+    current.activities.map((activity) => activity.id),
+  );
+
+  return next.activities.find(
+    (activity) =>
+      !currentIds.has(activity.id) &&
+      activity.type === 'system' &&
+      [
+        'Moneda convertida',
+        'Cotización actualizada',
+      ].includes(activity.title),
+  );
+}
+
+function isCurrencyOnlyRestore(
+  current: CRMData,
+  next: CRMData,
+): boolean {
+  if (
+    current.settings.organization !==
+      next.settings.organization ||
+    current.settings.userName !== next.settings.userName
+  ) {
+    return false;
+  }
+
+  if (
+    !sameRecords(current.companies, next.companies) ||
+    !sameRecords(current.contacts, next.contacts) ||
+    !sameRecords(current.tasks, next.tasks) ||
+    !sameDealsExceptAmounts(current.deals, next.deals)
+  ) {
+    return false;
+  }
+
+  const currentIds = new Set(
+    current.activities.map((activity) => activity.id),
+  );
+
+  const addedActivities = next.activities.filter(
+    (activity) => !currentIds.has(activity.id),
+  );
+
+  return addedActivities.every(
+    (activity) =>
+      activity.type === 'system' &&
+      [
+        'Moneda convertida',
+        'Cotización actualizada',
+      ].includes(activity.title),
+  );
+}
+
+// ============================================
 // PROVIDER
 // ============================================
 
@@ -301,6 +433,7 @@ export function CRMProvider({
     }
 
     const organizationId = workspace.organizationId;
+    const organizationRole = workspace.role;
     let active = true;
 
     setIsLoading(true);
@@ -311,14 +444,16 @@ export function CRMProvider({
         const remoteData = await loadCRMData(
           organizationId,
           initialSettings,
+          organizationRole,
         );
 
         if (!active) return;
 
-        setData({
-          ...remoteData,
-          settings: initialSettings,
-        });
+        // Supabase es la fuente de verdad para moneda y cotización.
+        // initialSettings solo aporta el nombre personal y sirve como
+        // respaldo de inicialización si la organización aún no fue configurada.
+
+        setData(remoteData);
 
         setIsLoading(false);
 
@@ -347,6 +482,7 @@ export function CRMProvider({
   }, [
     cloudMode,
     workspace?.organizationId,
+    workspace?.role,
     loadAttempt,
     initialSettings,
     localDataAvailable,
@@ -998,12 +1134,45 @@ export function CRMProvider({
             validated.settings.organization.trim() !==
             data.settings.organization;
 
+          const currencySettingsChanged =
+            hasCurrencySettingsChanged(
+              data.settings,
+              validated.settings,
+            );
+
           if (
             (removesRecords || changesOrganization) &&
             workspace.role !== 'admin'
           ) {
             notify(
               'Esta restauración modifica o elimina registros del espacio de trabajo y requiere permisos de administrador.',
+            );
+
+            return;
+          }
+
+          if (
+            currencySettingsChanged &&
+            workspace.role !== 'admin'
+          ) {
+            notify(
+              'Solo un administrador puede modificar la moneda y la cotización del espacio de trabajo.',
+            );
+
+            return;
+          }
+
+          if (
+            currencySettingsChanged &&
+            validated.deals.some(
+              (deal) =>
+                typeof deal.amountBaseARS !== 'number' ||
+                !Number.isFinite(deal.amountBaseARS) ||
+                deal.amountBaseARS < 0,
+            )
+          ) {
+            notify(
+              'No se aplicó el cambio monetario porque hay oportunidades sin un importe base ARS válido. No se modificó ningún registro.',
             );
 
             return;
@@ -1017,6 +1186,18 @@ export function CRMProvider({
             ),
           };
 
+          const currencyOnly =
+            currencySettingsChanged &&
+            isCurrencyOnlyRestore(data, nextData);
+
+          // Para una conversión monetaria pura, la interfaz cambia
+          // inmediatamente. La operación remota se confirma después
+          // mediante una única transacción RPC en PostgreSQL.
+
+          if (currencyOnly) {
+            setData(nextData);
+          }
+
           void (async () => {
             try {
               if (changesOrganization) {
@@ -1026,37 +1207,115 @@ export function CRMProvider({
                 );
               }
 
-              await syncCRMBackup(
-                data,
-                nextData,
-                workspace.organizationId,
-              );
+              if (currencyOnly) {
+                const activity = findNewCurrencyActivity(
+                  data,
+                  nextData,
+                );
+
+                await applyOrganizationCurrencySettings(
+                  workspace.organizationId,
+                  nextData.settings,
+                  activity,
+                );
+              } else {
+                // Las restauraciones generales conservan el flujo
+                // existente de sincronización de registros.
+
+                await syncCRMBackup(
+                  data,
+                  nextData,
+                  workspace.organizationId,
+                );
+
+                // Si el respaldo también cambia la moneda, primero
+                // sincronizamos sus registros y después recalculamos
+                // todos los importes desde amount_base_ars en PostgreSQL.
+
+                if (currencySettingsChanged) {
+                  const activity = findNewCurrencyActivity(
+                    data,
+                    nextData,
+                  );
+
+                  await applyOrganizationCurrencySettings(
+                    workspace.organizationId,
+                    nextData.settings,
+                    activity,
+                  );
+                }
+              }
 
               const storageError = writeCRMSettings(
                 workspace.organizationId,
                 nextData.settings,
               );
 
-              setData(nextData);
+              if (currencySettingsChanged) {
+                // Reconciliamos la vista con los importes confirmados
+                // por PostgreSQL y las preferencias compartidas.
 
-              notify(
-                storageError
-                  ? 'Los datos se sincronizaron, pero ' + storageError
-                  : 'Respaldo y preferencias sincronizados con Supabase.',
-              );
-            } catch (error) {
-              try {
                 const refreshed = await loadCRMData(
                   workspace.organizationId,
-                  data.settings,
+                  nextData.settings,
+                  workspace.role,
                 );
 
                 setData({
                   ...refreshed,
-                  settings: data.settings,
+                  settings: {
+                    ...refreshed.settings,
+                    userName: nextData.settings.userName,
+                  },
                 });
-              } catch {
-                // Conservamos la vista actual si también falla la recarga.
+              } else {
+                setData(nextData);
+              }
+
+              notify(
+                storageError
+                  ? 'Los datos se sincronizaron con Supabase, pero ' +
+                      storageError
+                  : currencySettingsChanged
+                    ? 'Moneda, cotización e importes sincronizados con Supabase para todo el equipo.'
+                    : 'Respaldo y preferencias sincronizados con Supabase.',
+              );
+            } catch (error) {
+              if (currencySettingsChanged) {
+                try {
+                  const refreshed = await loadCRMData(
+                    workspace.organizationId,
+                    data.settings,
+                    workspace.role,
+                  );
+
+                  setData({
+                    ...refreshed,
+                    settings: {
+                      ...refreshed.settings,
+                      userName: data.settings.userName,
+                    },
+                  });
+                } catch {
+                  // Si también falla la recarga, evitamos dejar
+                  // visible una conversión que no fue confirmada.
+
+                  if (currencyOnly) {
+                    setData(data);
+                  }
+                }
+              } else {
+                try {
+                  const refreshed = await loadCRMData(
+                    workspace.organizationId,
+                    data.settings,
+                    workspace.role,
+                  );
+
+                  setData(refreshed);
+                } catch {
+                  // Conservamos la vista actual si también falla la recarga.
+                }
               }
 
               notify(
@@ -1074,9 +1333,11 @@ export function CRMProvider({
         setStorageIssue('');
 
         notify('Respaldo restaurado correctamente.');
-      } catch {
+      } catch (error) {
         notify(
-          'No se restauró el respaldo: contiene datos inválidos.',
+          error instanceof Error
+            ? 'No se restauró el respaldo: ' + error.message
+            : 'No se restauró el respaldo: contiene datos inválidos.',
         );
       }
     },
