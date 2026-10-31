@@ -1,0 +1,339 @@
+
+/* NEXO CRM — Eventos del calendario */
+
+.nexo-calendar-page {
+  min-width: 0;
+}
+
+.nexo-calendar-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.nexo-cal-summary-events {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.nexo-calendar-loading {
+  display: block;
+  margin-top: 5px;
+  color: #91a9ce;
+  font-size: 10px;
+}
+
+.nexo-calendar-alert {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 15px;
+  border: 1px solid #8b5a65;
+  border-radius: 10px;
+  background: #46232d66;
+  color: #f5cbd2;
+  font-size: 12px;
+}
+
+.nexo-calendar-alert span {
+  flex: 1 1 260px;
+  color: #d9b8c0;
+}
+
+.nexo-calendar-legend i.meeting {
+  background: #44c5ae;
+}
+
+.nexo-calendar-event-item {
+  align-items: flex-start;
+  width: 100%;
+}
+
+.nexo-calendar-event-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: #9de8d8;
+  background: #2a9d8526;
+  border: 1px solid #3eaa963f;
+}
+
+.nexo-calendar-event-mark.event-call {
+  color: #a8c5ff;
+  background: #4b79d52b;
+  border-color: #5e88db55;
+}
+
+.nexo-calendar-event-mark.event-reminder {
+  color: #e4c28b;
+  background: #b98a3b24;
+  border-color: #b98a3b55;
+}
+
+.nexo-calendar-event-mark.event-other {
+  color: #d1b0ff;
+  background: #9460d52b;
+  border-color: #9460d555;
+}
+
+.nexo-calendar-event-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.nexo-calendar-event-actions .nexo-extras-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.nexo-calendar-event-actions .danger {
+  color: #f2a5b1;
+}
+
+.nexo-calendar-event-actions .danger:hover {
+  border-color: #bd6676;
+  background: #612d3b;
+}
+
+.nexo-calendar-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nexo-calendar-location svg {
+  flex: 0 0 auto;
+}
+
+.nexo-calendar-description {
+  margin: 4px 0 0;
+  color: #aebfda;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nexo-cal-dot.event-meeting {
+  color: #9ce8d8;
+  background: #278d782f;
+}
+
+.nexo-cal-dot.event-call {
+  color: #abc8ff;
+  background: #4777e12b;
+}
+
+.nexo-cal-dot.event-reminder {
+  color: #f0d29c;
+  background: #a9792c35;
+}
+
+.nexo-cal-dot.event-other {
+  color: #d7baff;
+  background: #9260db32;
+}
+
+/* FORMULARIO DE EVENTOS */
+
+.nexo-calendar-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: #050914c9;
+  backdrop-filter: blur(7px);
+}
+
+.nexo-calendar-modal {
+  width: min(100%, 610px);
+  max-height: min(90vh, 850px);
+  overflow: auto;
+  border: 1px solid #40547b;
+  border-radius: 16px;
+  background: #121e37;
+  color: #eaf1ff;
+  box-shadow: 0 24px 80px #0009;
+}
+
+.nexo-calendar-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 21px 23px 17px;
+  border-bottom: 1px solid #34486a;
+}
+
+.nexo-calendar-modal-header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.nexo-calendar-modal-header span {
+  color: #91aff0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+
+.nexo-calendar-modal-header h2 {
+  margin: 0;
+  color: #f0f5ff;
+  font-size: 20px;
+}
+
+.nexo-calendar-form {
+  display: grid;
+  gap: 15px;
+  padding: 20px 23px 23px;
+}
+
+.nexo-calendar-form label {
+  display: grid;
+  gap: 7px;
+  color: #c9d7ed;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.nexo-calendar-form input:not([type="checkbox"]),
+.nexo-calendar-form select,
+.nexo-calendar-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #40547b;
+  border-radius: 9px;
+  padding: 10px 11px;
+  outline: 0;
+  background: #0e192f;
+  color: #eff5ff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.nexo-calendar-form input:focus,
+.nexo-calendar-form select:focus,
+.nexo-calendar-form textarea:focus {
+  border-color: #7da6ff;
+  box-shadow: 0 0 0 3px #6798f329;
+}
+
+.nexo-calendar-form input::placeholder,
+.nexo-calendar-form textarea::placeholder {
+  color: #7588a8;
+}
+
+.nexo-calendar-form textarea {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.nexo-calendar-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nexo-calendar-form .nexo-calendar-all-day {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  color: #b9c9e4;
+  font-weight: 500;
+}
+
+.nexo-calendar-all-day input {
+  width: 15px;
+  height: 15px;
+  accent-color: #719dff;
+}
+
+.nexo-calendar-form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #a85c6a;
+  border-radius: 8px;
+  background: #682c3a55;
+  color: #ffd0d8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nexo-calendar-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 5px;
+}
+
+.nexo-calendar-form-actions button {
+  min-height: 38px;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 700px) {
+  .nexo-calendar-heading-actions {
+    width: 100%;
+  }
+
+  .nexo-calendar-heading-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .nexo-cal-summary-events {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nexo-calendar-modal-backdrop {
+    padding: 10px;
+    align-items: end;
+  }
+
+  .nexo-calendar-modal {
+    max-height: 94vh;
+    border-radius: 15px 15px 10px 10px;
+  }
+
+  .nexo-calendar-modal-header {
+    padding: 18px 17px 14px;
+  }
+
+  .nexo-calendar-form {
+    padding: 17px;
+  }
+
+  .nexo-calendar-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .nexo-calendar-heading-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nexo-calendar-heading-actions button {
+    width: 100%;
+  }
+
+  .nexo-calendar-event-item {
+    flex-wrap: wrap;
+  }
+
+  .nexo-calendar-event-actions {
+    margin-left: 44px;
+  }
+}
