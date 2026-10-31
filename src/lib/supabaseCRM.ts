@@ -9,6 +9,7 @@ import type {
 } from '../types';
 
 import { supabase } from './supabase';
+import type { WorkspaceRole } from './workspace';
 
 export type CRMCollection =
   | 'companies'
@@ -73,11 +74,164 @@ function asDate(value: unknown): string {
   return typeof value === 'string' ? value.slice(0, 10) : '';
 }
 
+type OrganizationRow = {
+  id: string;
+  name: string;
+  currency: string | null;
+  exchange_rate: number | string | null;
+  exchange_rate_source: string | null;
+  exchange_rate_updated_at: string | null;
+};
+
+function isCurrency(value: unknown): value is 'ARS' | 'USD' {
+  return value === 'ARS' || value === 'USD';
+}
+
+async function readOrganizationRow(
+  organizationId: string,
+): Promise<OrganizationRow> {
+  const client = requireClient();
+
+  const { data, error } = await client
+    .from('organizations')
+    .select(
+      'id, name, currency, exchange_rate, exchange_rate_source, exchange_rate_updated_at',
+    )
+    .eq('id', organizationId)
+    .single();
+
+  if (error) throw error;
+
+  if (!data) {
+    throw new Error(
+      'No se encontró la organización activa en Supabase.',
+    );
+  }
+
+  return data as OrganizationRow;
+}
+
+async function loadOrganizationSettings(
+  organizationId: string,
+  fallback: CRMData['settings'],
+  role: WorkspaceRole,
+): Promise<CRMData['settings']> {
+  const client = requireClient();
+
+  let organization = await readOrganizationRow(organizationId);
+
+  // La migración agrega columnas inicialmente nulas.
+  // El primer administrador inicializa una sola vez la configuración
+  // usando sus preferencias ya guardadas en este navegador.
+
+  if (organization.currency === null) {
+    if (role !== 'admin') {
+      throw new Error(
+        'La configuración monetaria de este espacio todavía no fue inicializada. ' +
+          'Pedile al administrador que ingrese primero a NEXO CRM.',
+      );
+    }
+
+    const fallbackRate = fallback.exchangeRate ?? null;
+
+    const fallbackUpdatedAt =
+      fallback.exchangeRateUpdatedAt &&
+      Number.isFinite(Date.parse(fallback.exchangeRateUpdatedAt))
+        ? fallback.exchangeRateUpdatedAt
+        : new Date().toISOString();
+
+    if (fallback.currency === 'USD' && fallbackRate === null) {
+      throw new Error(
+        'La organización todavía no tiene una cotización guardada. ' +
+          'Ingresá primero una cotización válida desde Configuración.',
+      );
+    }
+
+    const { error: initializeError } = await client.rpc(
+      'nexo_initialize_currency_settings',
+      {
+        p_organization_id: organizationId,
+        p_currency: fallback.currency,
+        p_exchange_rate: fallbackRate,
+        p_exchange_rate_source:
+          fallbackRate === null
+            ? null
+            : fallback.exchangeRateSource ?? 'manual',
+        p_exchange_rate_updated_at:
+          fallbackRate === null
+            ? null
+            : fallbackUpdatedAt,
+      },
+    );
+
+    if (initializeError) throw initializeError;
+
+    // Volvemos a leer para respetar la configuración que haya quedado
+    // persistida si dos sesiones inicializaron al mismo tiempo.
+
+    organization = await readOrganizationRow(organizationId);
+  }
+
+  if (!isCurrency(organization.currency)) {
+    throw new Error(
+      'La moneda guardada para esta organización no es válida.',
+    );
+  }
+
+  const exchangeRate = asOptionalNumber(
+    organization.exchange_rate,
+  );
+
+  if (
+    organization.currency === 'USD' &&
+    (exchangeRate === undefined || exchangeRate <= 0)
+  ) {
+    throw new Error(
+      'La organización está configurada en USD, pero no tiene una cotización válida.',
+    );
+  }
+
+  const source =
+    organization.exchange_rate_source === 'manual' ||
+    organization.exchange_rate_source === 'oficial'
+      ? organization.exchange_rate_source
+      : undefined;
+
+  return {
+    organization: String(
+      organization.name || fallback.organization,
+    ),
+    userName: fallback.userName,
+    currency: organization.currency,
+    ...(exchangeRate !== undefined
+      ? { exchangeRate }
+      : {}),
+    ...(source ? { exchangeRateSource: source } : {}),
+    ...(organization.exchange_rate_updated_at
+      ? {
+          exchangeRateUpdatedAt:
+            organization.exchange_rate_updated_at,
+        }
+      : {}),
+  };
+}
+
 export async function loadCRMData(
   organizationId: string,
-  settings: CRMData['settings'],
+  fallbackSettings: CRMData['settings'],
+  role: WorkspaceRole,
 ): Promise<CRMData> {
   const client = requireClient();
+
+  // Primero cargamos la configuración de la organización.
+  // Esto garantiza que la moneda ya esté inicializada antes de leer
+  // las oportunidades y evita mostrar importes con preferencias locales.
+
+  const settings = await loadOrganizationSettings(
+    organizationId,
+    fallbackSettings,
+    role,
+  );
 
   const [
     companiesResult,
@@ -207,6 +361,62 @@ export async function loadCRMData(
     activities,
     settings,
   };
+}
+
+// ============================================
+// CONFIGURACIÓN MONETARIA COMPARTIDA
+// ============================================
+
+export async function applyOrganizationCurrencySettings(
+  organizationId: string,
+  settings: CRMData['settings'],
+  activity?: Activity,
+): Promise<void> {
+  const client = requireClient();
+
+  if (!isCurrency(settings.currency)) {
+    throw new Error('La moneda seleccionada no es válida.');
+  }
+
+  const exchangeRate = settings.exchangeRate ?? null;
+
+  if (
+    exchangeRate !== null &&
+    (
+      !Number.isFinite(exchangeRate) ||
+      exchangeRate <= 0 ||
+      exchangeRate > 1_000_000_000
+    )
+  ) {
+    throw new Error('La cotización ingresada no es válida.');
+  }
+
+  if (settings.currency === 'USD' && exchangeRate === null) {
+    throw new Error(
+      'Para utilizar USD necesitás guardar una cotización válida.',
+    );
+  }
+
+  const { error } = await client.rpc(
+    'nexo_apply_currency_settings',
+    {
+      p_organization_id: organizationId,
+      p_currency: settings.currency,
+      p_exchange_rate: exchangeRate,
+      p_exchange_rate_source:
+        exchangeRate === null
+          ? null
+          : settings.exchangeRateSource ?? 'manual',
+      p_exchange_rate_updated_at:
+        settings.exchangeRateUpdatedAt ?? null,
+      p_activity_id: activity?.id ?? null,
+      p_activity_title: activity?.title ?? null,
+      p_activity_detail: activity?.detail ?? null,
+      p_activity_created_at: activity?.createdAt ?? null,
+    },
+  );
+
+  if (error) throw error;
 }
 
 function recordPayload(
@@ -488,6 +698,7 @@ export async function syncCRMBackup(
 
   // El historial es de solo inserción.
   // Nunca eliminamos actividades existentes.
+
   const currentActivityIds = new Set(
     current.activities.map((activity) => activity.id),
   );
