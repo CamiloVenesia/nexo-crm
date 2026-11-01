@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity as ActivityIcon,
   ArrowRight,
-  Bell,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -26,11 +25,15 @@ import {
 } from 'lucide-react';
 
 import { Avatar, Brand } from './components/Shared';
+import { NotificationCenter } from './components/NotificationCenter';
+import type { CRMNotification } from './components/NotificationCenter';
 import { EditorModal } from './components/EditorModal';
 import type { Editing } from './components/EditorModal';
+
 import { CRMProvider, useCRM } from './lib/store';
 import { searchCRM } from './lib/search';
 import { downloadJSON, overdue } from './lib/utils';
+
 import type { Deal, Page, Task } from './types';
 
 import { Dashboard } from './views/Dashboard';
@@ -80,7 +83,6 @@ function WorkSpace() {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -93,7 +95,6 @@ function WorkSpace() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     setSearchOpen(false);
-    setAlertsOpen(false);
     setProfileOpen(false);
     setMenuOpen(false);
   };
@@ -127,7 +128,6 @@ function WorkSpace() {
 
       if (event.key === 'Escape') {
         setSearchOpen(false);
-        setAlertsOpen(false);
         setProfileOpen(false);
         setMenuOpen(false);
         setHelpOpen(false);
@@ -161,6 +161,7 @@ function WorkSpace() {
           navigate('deals');
           setEditing({ kind: 'deal', value });
         }
+
         break;
       }
 
@@ -173,6 +174,7 @@ function WorkSpace() {
           navigate('contacts');
           setEditing({ kind: 'contact', value });
         }
+
         break;
       }
 
@@ -185,6 +187,7 @@ function WorkSpace() {
           navigate('companies');
           setEditing({ kind: 'company', value });
         }
+
         break;
       }
 
@@ -197,12 +200,107 @@ function WorkSpace() {
           navigate('tasks');
           setEditing({ kind: 'task', value });
         }
+
         break;
       }
     }
 
     setSearch('');
     setSearchOpen(false);
+  };
+
+  // ==========================================
+  // ABRIR REGISTRO DESDE UNA NOTIFICACIÓN
+  // ==========================================
+
+  const openNotification = (item: CRMNotification) => {
+    const entityId = item.entity_id ?? '';
+
+    if (
+      item.entity_type === 'conversation' ||
+      item.notification_type === 'message'
+    ) {
+      navigate('messages');
+      return;
+    }
+
+    if (
+      item.entity_type === 'event' ||
+      item.notification_type === 'event_due' ||
+      item.notification_type === 'event'
+    ) {
+      navigate('calendar');
+      return;
+    }
+
+    if (
+      item.entity_type === 'task' ||
+      item.notification_type === 'task_due'
+    ) {
+      const value = data.tasks.find(
+        (task) => task.id === entityId,
+      );
+
+      navigate('tasks');
+
+      if (value) {
+        setEditing({ kind: 'task', value });
+      }
+
+      return;
+    }
+
+    if (
+      item.entity_type === 'deal' ||
+      item.notification_type === 'deal_due'
+    ) {
+      const value = data.deals.find(
+        (deal) => deal.id === entityId,
+      );
+
+      navigate('deals');
+
+      if (value) {
+        setEditing({ kind: 'deal', value });
+      }
+
+      return;
+    }
+
+    if (item.entity_type === 'company') {
+      const value = data.companies.find(
+        (company) => company.id === entityId,
+      );
+
+      navigate('companies');
+
+      if (value) {
+        setEditing({ kind: 'company', value });
+      }
+
+      return;
+    }
+
+    if (item.entity_type === 'contact') {
+      const value = data.contacts.find(
+        (contact) => contact.id === entityId,
+      );
+
+      navigate('contacts');
+
+      if (value) {
+        setEditing({ kind: 'contact', value });
+      }
+
+      return;
+    }
+
+    if (item.entity_type === 'activity') {
+      navigate('activity');
+      return;
+    }
+
+    navigate('activity');
   };
 
   const navLinks = nav.map(({ id, label, icon: Icon }) => (
@@ -315,66 +413,11 @@ function WorkSpace() {
               )}
             </div>
 
-            <div className="popover-anchor">
-              <button
-                type="button"
-                className="tool-icon"
-                aria-label="Notificaciones"
-                aria-expanded={alertsOpen}
-                onClick={() => {
-                  setAlertsOpen((open) => !open);
-                  setProfileOpen(false);
-                }}
-              >
-                <Bell size={18} />
-
-                {urgent.length > 0 && (
-                  <span className="notif-count">
-                    {urgent.length}
-                  </span>
-                )}
-              </button>
-
-              {alertsOpen && (
-                <div className="floating-menu notifications">
-                  <div className="dropdown-label">
-                    SEGUIMIENTOS VENCIDOS
-                  </div>
-
-                  {urgent.length ? (
-                    urgent.slice(0, 4).map((task) => (
-                      <button
-                        type="button"
-                        key={task.id}
-                        onClick={() => navigate('tasks')}
-                      >
-                        <CalendarClock size={17} />
-
-                        <span>
-                          <strong>{task.title}</strong>
-                          <small>
-                            Tarea vencida · Revisar
-                          </small>
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="muted">
-                      No tenés tareas vencidas.
-                    </p>
-                  )}
-
-                  <button
-                    type="button"
-                    className="menu-bottom"
-                    onClick={() => navigate('tasks')}
-                  >
-                    Ir a tareas
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+            <NotificationCenter
+              fallbackTasks={urgent}
+              onOpen={openNotification}
+              onOpenPanel={() => setProfileOpen(false)}
+            />
 
             <div className="popover-anchor">
               <button
@@ -384,7 +427,6 @@ function WorkSpace() {
                 aria-expanded={profileOpen}
                 onClick={() => {
                   setProfileOpen((open) => !open);
-                  setAlertsOpen(false);
                 }}
               >
                 <Avatar
@@ -690,13 +732,11 @@ function WorkSpace() {
               </button>
             </header>
 
-            
             <h2>
               Todo lo importante,
               <br />
               <span>en un solo lugar.</span>
             </h2>
-
 
             <p>
               Registrá un cliente, sumá sus contactos,

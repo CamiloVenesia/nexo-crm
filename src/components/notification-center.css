@@ -1,0 +1,354 @@
+
+/* NEXO CRM — Centro de notificaciones */
+
+.nexo-notification-anchor {
+  flex: 0 0 auto;
+}
+
+.nexo-notification-trigger {
+  flex: 0 0 37px;
+  cursor: pointer;
+}
+
+.nexo-notification-panel {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 13px);
+  right: -8px;
+  width: min(390px, calc(100vw - 28px));
+  max-height: min(620px, calc(100vh - 105px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #e9efff;
+  background: linear-gradient(155deg, #172442 0%, #101a31 58%, #111a30 100%);
+  border: 1px solid #3b5079;
+  border-radius: 16px;
+  box-shadow: 0 24px 70px #020616e8, inset 0 1px 0 #ffffff0a;
+  text-align: left;
+}
+
+.nexo-notification-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #2b3c60;
+}
+
+.nexo-notification-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #7da9ff;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 1.35px;
+}
+
+.nexo-notification-header h2 {
+  margin: 0;
+  color: #f0f4ff;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.35px;
+}
+
+.nexo-notification-header p {
+  margin: 5px 0 0;
+  color: #98abc9;
+  font-size: 11px;
+}
+
+.nexo-notification-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  color: #a9bad8;
+  background: #1b2a49;
+  border: 1px solid #3b5079;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: .16s ease;
+}
+
+.nexo-notification-close:hover {
+  color: #fff;
+  background: #2b4169;
+  border-color: #6489cb;
+}
+
+.nexo-notification-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 14px;
+  border-bottom: 1px solid #263757;
+  background: #101b32a8;
+}
+
+.nexo-notification-toolbar button,
+.nexo-notification-footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  color: #91b6ff;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nexo-notification-toolbar button:hover,
+.nexo-notification-footer button:hover {
+  color: #dce8ff;
+  background: #263a60;
+}
+
+.nexo-notification-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  color: #f1c4ca;
+  background: #4b253540;
+  border-bottom: 1px solid #71404e;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.nexo-notification-error button {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  color: #fff;
+  background: #643649;
+  border: 1px solid #92536b;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nexo-notification-list {
+  min-height: 90px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #40577f transparent;
+}
+
+.nexo-notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 15px;
+  color: #e9efff;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #263654;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.nexo-notification-item:hover {
+  background: #233657;
+}
+
+.nexo-notification-item.unread {
+  background: #23385a66;
+}
+
+.nexo-notification-item.unread:hover {
+  background: #2a4269;
+}
+
+.nexo-notification-icon {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  flex: 0 0 35px;
+  border: 1px solid #49628a;
+  border-radius: 11px;
+  color: #a9c5ff;
+  background: #263b60;
+}
+
+.nexo-notification-icon.message {
+  color: #a7d8ff;
+  background: #1d4260;
+  border-color: #37698d;
+}
+
+.nexo-notification-icon.activity {
+  color: #c2b5ff;
+  background: #342c61;
+  border-color: #5d4d9d;
+}
+
+.nexo-notification-icon.event {
+  color: #a9c7ff;
+  background: #263c69;
+  border-color: #4869a6;
+}
+
+.nexo-notification-icon.task {
+  color: #7de1c4;
+  background: #1c4b4a;
+  border-color: #347d70;
+}
+
+.nexo-notification-icon.deal {
+  color: #e5b6ff;
+  background: #49305e;
+  border-color: #76509a;
+}
+
+.nexo-notification-copy {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+.nexo-notification-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nexo-notification-item-top strong {
+  display: block;
+  min-width: 0;
+  color: #eaf0ff;
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.nexo-notification-item-top i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #5d9cff;
+  box-shadow: 0 0 0 3px #5d9cff20;
+}
+
+.nexo-notification-body {
+  display: -webkit-box;
+  margin-top: 4px;
+  color: #aabbd8;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.nexo-notification-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  color: #8197bb;
+  font-size: 9px;
+}
+
+.nexo-notification-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 205px;
+  padding: 25px 30px;
+  color: #8ea5c9;
+  text-align: center;
+}
+
+.nexo-notification-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 12px;
+  color: #83cbb9;
+  background: #1d4a4a;
+  border: 1px solid #39776f;
+  border-radius: 14px;
+}
+
+.nexo-notification-empty strong {
+  color: #dce7fb;
+  font-size: 12px;
+}
+
+.nexo-notification-empty p {
+  max-width: 250px;
+  margin: 7px 0 0;
+  color: #8fa3c4;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.nexo-notification-spinner {
+  width: 21px;
+  height: 21px;
+  margin-bottom: 12px;
+  border: 2px solid #4b638c;
+  border-top-color: #8bb4ff;
+  border-radius: 50%;
+  animation: nexo-notification-spin .75s linear infinite;
+}
+
+@keyframes nexo-notification-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.nexo-notification-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 5px 12px 5px 15px;
+  background: #0e182d;
+  border-top: 1px solid #2a3a5c;
+}
+
+.nexo-notification-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #8299bd;
+  font-size: 9px;
+}
+
+.nexo-notification-footer button:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+@media (max-width: 600px) {
+  .nexo-notification-panel {
+    position: fixed;
+    top: 66px;
+    right: 10px;
+    width: min(390px, calc(100vw - 20px));
+    max-height: calc(100vh - 86px);
+  }
+}
