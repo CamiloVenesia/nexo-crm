@@ -1,5 +1,12 @@
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   Activity as ActivityIcon,
@@ -36,18 +43,76 @@ import { downloadJSON, overdue } from './lib/utils';
 
 import type { Deal, Page, Task } from './types';
 
-import { Dashboard } from './views/Dashboard';
-import { Deals } from './views/Deals';
-import { Contacts } from './views/Contacts';
-import { Companies } from './views/Companies';
-import { Tasks } from './views/Tasks';
-import { Activity } from './views/Activity';
-import { Insights } from './views/Insights';
-import { Settings } from './views/Settings';
-import { Messages } from './views/Messages';
-import { Calendar } from './views/Calendar';
-
 import './styles.css';
+
+// ======================================================
+// CARGA DIFERIDA DE LAS PANTALLAS
+// Cada pantalla se descarga cuando se utiliza.
+// ======================================================
+
+const Dashboard = lazy(() =>
+  import('./views/Dashboard').then((module) => ({
+    default: module.Dashboard,
+  })),
+);
+
+const Deals = lazy(() =>
+  import('./views/Deals').then((module) => ({
+    default: module.Deals,
+  })),
+);
+
+const Contacts = lazy(() =>
+  import('./views/Contacts').then((module) => ({
+    default: module.Contacts,
+  })),
+);
+
+const Companies = lazy(() =>
+  import('./views/Companies').then((module) => ({
+    default: module.Companies,
+  })),
+);
+
+const Tasks = lazy(() =>
+  import('./views/Tasks').then((module) => ({
+    default: module.Tasks,
+  })),
+);
+
+const Activity = lazy(() =>
+  import('./views/Activity').then((module) => ({
+    default: module.Activity,
+  })),
+);
+
+const Insights = lazy(() =>
+  import('./views/Insights').then((module) => ({
+    default: module.Insights,
+  })),
+);
+
+const Settings = lazy(() =>
+  import('./views/Settings').then((module) => ({
+    default: module.Settings,
+  })),
+);
+
+const Messages = lazy(() =>
+  import('./views/Messages').then((module) => ({
+    default: module.Messages,
+  })),
+);
+
+const Calendar = lazy(() =>
+  import('./views/Calendar').then((module) => ({
+    default: module.Calendar,
+  })),
+);
+
+// ======================================================
+// NAVEGACIÓN
+// ======================================================
 
 type WorkspacePage = Page | 'messages' | 'calendar';
 
@@ -71,6 +136,33 @@ const validPages: WorkspacePage[] = [
   ...nav.map((item) => item.id),
   'settings',
 ];
+
+// ======================================================
+// ESTADO DE CARGA
+// ======================================================
+
+function LoadingPage() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 220,
+        color: '#a2b4d3',
+        fontSize: 13,
+      }}
+    >
+      Cargando sección...
+    </div>
+  );
+}
+
+// ======================================================
+// WORKSPACE
+// ======================================================
 
 function WorkSpace() {
   const { data, notification } = useCRM();
@@ -99,6 +191,10 @@ function WorkSpace() {
     setMenuOpen(false);
   };
 
+  // ====================================================
+  // SINCRONIZAR NAVEGACIÓN CON URL
+  // ====================================================
+
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.replace('#/', '') as WorkspacePage;
@@ -114,6 +210,10 @@ function WorkSpace() {
       window.removeEventListener('hashchange', onHashChange);
     };
   }, []);
+
+  // ====================================================
+  // ATAJOS DE TECLADO
+  // ====================================================
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -140,6 +240,10 @@ function WorkSpace() {
       window.removeEventListener('keydown', onKey);
     };
   }, []);
+
+  // ====================================================
+  // TAREAS Y BÚSQUEDA
+  // ====================================================
 
   const urgent = data.tasks
     .filter((task) => !task.done && overdue(task.dueDate))
@@ -209,9 +313,9 @@ function WorkSpace() {
     setSearchOpen(false);
   };
 
-  // ==========================================
-  // ABRIR REGISTRO DESDE UNA NOTIFICACIÓN
-  // ==========================================
+  // ====================================================
+  // NAVEGACIÓN DESDE NOTIFICACIONES
+  // ====================================================
 
   const openNotification = (item: CRMNotification) => {
     const entityId = item.entity_id ?? '';
@@ -295,13 +399,12 @@ function WorkSpace() {
       return;
     }
 
-    if (item.entity_type === 'activity') {
-      navigate('activity');
-      return;
-    }
-
     navigate('activity');
   };
+
+  // ====================================================
+  // ENLACES DE NAVEGACIÓN
+  // ====================================================
 
   const navLinks = nav.map(({ id, label, icon: Icon }) => (
     <button
@@ -322,6 +425,10 @@ function WorkSpace() {
       <div className="ambient-glow ambient-right" />
 
       <div className="app-frame">
+        {/* ==========================================
+            BARRA SUPERIOR
+        ========================================== */}
+
         <header className="topbar">
           <button
             className="brand-button"
@@ -340,6 +447,8 @@ function WorkSpace() {
           </nav>
 
           <div className="topbar-tools">
+            {/* BÚSQUEDA GLOBAL */}
+
             <div className="global-search">
               <button
                 type="button"
@@ -413,11 +522,15 @@ function WorkSpace() {
               )}
             </div>
 
+            {/* NOTIFICACIONES EXISTENTES */}
+
             <NotificationCenter
               fallbackTasks={urgent}
               onOpen={openNotification}
               onOpenPanel={() => setProfileOpen(false)}
             />
+
+            {/* PERFIL */}
 
             <div className="popover-anchor">
               <button
@@ -439,9 +552,7 @@ function WorkSpace() {
 
               {profileOpen && (
                 <div className="floating-menu profile-menu">
-                  <strong>
-                    {data.settings.userName}
-                  </strong>
+                  <strong>{data.settings.userName}</strong>
 
                   <small>
                     {data.settings.organization} · Demo local
@@ -483,6 +594,10 @@ function WorkSpace() {
           </div>
         </header>
 
+        {/* ==========================================
+            NAVEGACIÓN MÓVIL
+        ========================================== */}
+
         {menuOpen && (
           <nav
             className="mobile-nav"
@@ -502,6 +617,10 @@ function WorkSpace() {
         )}
 
         <div className="workspace-body">
+          {/* ==========================================
+              BARRA LATERAL
+          ========================================== */}
+
           <aside
             className="icon-rail"
             aria-label="Accesos rápidos"
@@ -581,86 +700,97 @@ function WorkSpace() {
             </div>
           </aside>
 
+          {/* ==========================================
+              CONTENIDO PRINCIPAL
+              NUEVA CARGA DIFERIDA
+          ========================================== */}
+
           <main className="main-area" id="main-content">
-            {page === 'dashboard' && (
-              <Dashboard
-                navigate={navigate}
-                newDeal={() =>
-                  setEditing({ kind: 'deal' })
-                }
-                editDeal={(value: Deal) =>
-                  setEditing({ kind: 'deal', value })
-                }
-              />
-            )}
+            <Suspense fallback={<LoadingPage />}>
+              {page === 'dashboard' && (
+                <Dashboard
+                  navigate={navigate}
+                  newDeal={() =>
+                    setEditing({ kind: 'deal' })
+                  }
+                  editDeal={(value: Deal) =>
+                    setEditing({ kind: 'deal', value })
+                  }
+                />
+              )}
 
-            {page === 'messages' && <Messages />}
+              {page === 'messages' && <Messages />}
 
-            {page === 'calendar' && (
-              <Calendar
-                onNewTask={() =>
-                  setEditing({ kind: 'task' })
-                }
-                onEditTask={(value: Task) =>
-                  setEditing({ kind: 'task', value })
-                }
-                onEditDeal={(value: Deal) =>
-                  setEditing({ kind: 'deal', value })
-                }
-              />
-            )}
+              {page === 'calendar' && (
+                <Calendar
+                  onNewTask={() =>
+                    setEditing({ kind: 'task' })
+                  }
+                  onEditTask={(value: Task) =>
+                    setEditing({ kind: 'task', value })
+                  }
+                  onEditDeal={(value: Deal) =>
+                    setEditing({ kind: 'deal', value })
+                  }
+                />
+              )}
 
-            {page === 'tasks' && (
-              <Tasks
-                onAdd={() =>
-                  setEditing({ kind: 'task' })
-                }
-                onEdit={(value: Task) =>
-                  setEditing({ kind: 'task', value })
-                }
-              />
-            )}
+              {page === 'tasks' && (
+                <Tasks
+                  onAdd={() =>
+                    setEditing({ kind: 'task' })
+                  }
+                  onEdit={(value: Task) =>
+                    setEditing({ kind: 'task', value })
+                  }
+                />
+              )}
 
-            {page === 'companies' && (
-              <Companies
-                onAdd={() =>
-                  setEditing({ kind: 'company' })
-                }
-                onEdit={(value) =>
-                  setEditing({ kind: 'company', value })
-                }
-              />
-            )}
+              {page === 'companies' && (
+                <Companies
+                  onAdd={() =>
+                    setEditing({ kind: 'company' })
+                  }
+                  onEdit={(value) =>
+                    setEditing({ kind: 'company', value })
+                  }
+                />
+              )}
 
-            {page === 'contacts' && (
-              <Contacts
-                onAdd={() =>
-                  setEditing({ kind: 'contact' })
-                }
-                onEdit={(value) =>
-                  setEditing({ kind: 'contact', value })
-                }
-              />
-            )}
+              {page === 'contacts' && (
+                <Contacts
+                  onAdd={() =>
+                    setEditing({ kind: 'contact' })
+                  }
+                  onEdit={(value) =>
+                    setEditing({ kind: 'contact', value })
+                  }
+                />
+              )}
 
-            {page === 'deals' && (
-              <Deals
-                onAdd={() =>
-                  setEditing({ kind: 'deal' })
-                }
-                onEdit={(value: Deal) =>
-                  setEditing({ kind: 'deal', value })
-                }
-              />
-            )}
+              {page === 'deals' && (
+                <Deals
+                  onAdd={() =>
+                    setEditing({ kind: 'deal' })
+                  }
+                  onEdit={(value: Deal) =>
+                    setEditing({ kind: 'deal', value })
+                  }
+                />
+              )}
 
-            {page === 'activity' && <Activity />}
+              {page === 'activity' && <Activity />}
 
-            {page === 'insights' && <Insights />}
+              {page === 'insights' && <Insights />}
 
-            {page === 'settings' && <Settings />}
+              {page === 'settings' && <Settings />}
+            </Suspense>
           </main>
         </div>
+
+        {/* ==========================================
+            PIE DE PÁGINA
+        ========================================== */}
 
         <footer className="app-footer">
           <span>
@@ -677,6 +807,10 @@ function WorkSpace() {
         </footer>
       </div>
 
+      {/* ==========================================
+          CIERRE DE BÚSQUEDA
+      ========================================== */}
+
       {searchOpen && (
         <button
           className="dismiss-popovers"
@@ -686,6 +820,10 @@ function WorkSpace() {
         />
       )}
 
+      {/* ==========================================
+          EDITOR DE REGISTROS
+      ========================================== */}
+
       {editing && (
         <EditorModal
           key={`${editing.kind}-${editing.value?.id ?? 'new'}`}
@@ -694,12 +832,20 @@ function WorkSpace() {
         />
       )}
 
+      {/* ==========================================
+          CONFIRMACIÓN DE OPERACIONES
+      ========================================== */}
+
       {notification && (
         <div className="toast" role="status">
           <CheckCircle2 size={18} />
           {notification}
         </div>
       )}
+
+      {/* ==========================================
+          AYUDA
+      ========================================== */}
 
       {helpOpen && (
         <div
@@ -786,6 +932,10 @@ function WorkSpace() {
     </div>
   );
 }
+
+// ======================================================
+// APLICACIÓN PRINCIPAL
+// ======================================================
 
 export default function App() {
   return (
