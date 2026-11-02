@@ -1,0 +1,167 @@
+
+/* ==========================================
+   NEXO CRM — RECUPERACIÓN DE ERRORES
+   ========================================== */
+
+.nexo-error-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0b1020;
+  color: #edf3ff;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.nexo-error-card {
+  width: min(100%, 460px);
+  padding: 32px;
+  background: #14213b;
+  border: 1px solid #354b72;
+  border-radius: 18px;
+  box-shadow: 0 22px 55px #03071470;
+}
+
+.nexo-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  color: #f7c58a;
+  background: #55412b;
+  border: 1px solid #8a693b;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.nexo-error-eyebrow {
+  display: block;
+  color: #8db2ff;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.nexo-error-card h1 {
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  margin: 0 0 14px;
+}
+
+.nexo-error-card p {
+  color: #b7c6e1;
+  line-height: 1.65;
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+
+.nexo-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.nexo-error-actions button {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nexo-error-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: #3c76e7;
+  color: #ffffff;
+  border: 1px solid #5d93fb;
+}
+
+.nexo-error-primary:hover {
+  background: #4e87f1;
+}
+
+.nexo-error-secondary {
+  background: #203456;
+  color: #e5eeff;
+  border: 1px solid #52719d;
+}
+
+.nexo-error-secondary:hover {
+  background: #2b4670;
+}
+
+.nexo-error-actions button:focus-visible {
+  outline: 2px solid #bed5ff;
+  outline-offset: 3px;
+}
+
+.nexo-error-card small {
+  display: block;
+  color: #8fa4c7;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ==========================================
+   AVISO DE CONEXIÓN
+   ========================================== */
+
+.nexo-connection-notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  width: max-content;
+  max-width: calc(100vw - 24px);
+
+  padding: 11px 15px;
+  border: 1px solid #9b7646;
+  border-radius: 10px;
+
+  background: #352b24;
+  box-shadow: 0 10px 30px #0008;
+  color: #ffe5b8;
+
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.nexo-connection-notice svg {
+  flex: 0 0 auto;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 560px) {
+  .nexo-error-card {
+    padding: 23px;
+  }
+
+  .nexo-error-card h1 {
+    font-size: 21px;
+  }
+
+  .nexo-connection-notice {
+    top: 8px;
+  }
+}

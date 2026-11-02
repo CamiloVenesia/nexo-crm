@@ -4,11 +4,21 @@ import ReactDOM from 'react-dom/client';
 
 import { AuthGate } from './components/AuthGate';
 
+import {
+  AppErrorBoundary,
+  ConnectionNotice,
+} from './components/AppErrorBoundary';
+
 import './navigation-polish.css';
 import './ux-polish.css';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(
+  document.getElementById('root')!,
+).render(
   <React.StrictMode>
-    <AuthGate />
+    <AppErrorBoundary>
+      <ConnectionNotice />
+      <AuthGate />
+    </AppErrorBoundary>
   </React.StrictMode>,
 );
