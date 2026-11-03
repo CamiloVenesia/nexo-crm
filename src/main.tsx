@@ -2,12 +2,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
-import { AuthGate } from './components/AuthGate';
-
 import {
   AppErrorBoundary,
   ConnectionNotice,
 } from './components/AppErrorBoundary';
+
+import { DemoPortal } from './components/DemoPortal';
 
 import './navigation-polish.css';
 import './ux-polish.css';
@@ -18,7 +18,7 @@ ReactDOM.createRoot(
   <React.StrictMode>
     <AppErrorBoundary>
       <ConnectionNotice />
-      <AuthGate />
+      <DemoPortal />
     </AppErrorBoundary>
   </React.StrictMode>,
 );

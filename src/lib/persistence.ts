@@ -11,7 +11,12 @@ import {
 } from './currencyExchange';
 
 export const STORAGE_KEY = 'nexo-crm-v1';
-export const SETTINGS_STORAGE_PREFIX = 'nexo-crm-settings-v1:';
+
+export const DEMO_STORAGE_KEY =
+  'nexo-crm-public-demo-v1';
+
+export const SETTINGS_STORAGE_PREFIX =
+  'nexo-crm-settings-v1:';
 
 type StorageReader =
   Pick<Storage, 'getItem'>;
@@ -41,8 +46,37 @@ export type LoadResult =
       message: string;
     };
 
-function browserStorage(): StorageReader & StorageWriter {
-  return window.localStorage;
+// ============================================
+// IDENTIFICAR EL MODO DEMO PÚBLICO
+// ============================================
+
+export function isPublicDemoMode(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return (
+    new URLSearchParams(
+      window.location.search,
+    ).get('demo') === '1'
+  );
+}
+
+function activeStorageKey(): string {
+  return isPublicDemoMode()
+    ? DEMO_STORAGE_KEY
+    : STORAGE_KEY;
+}
+
+function browserStorage():
+  StorageReader & StorageWriter {
+  // La demostración se guarda por pestaña.
+  // Los datos locales anteriores se conservan
+  // en su almacenamiento original.
+
+  return isPublicDemoMode()
+    ? window.sessionStorage
+    : window.localStorage;
 }
 
 // ============================================
@@ -55,7 +89,9 @@ export function readCRMStorage(
   let raw: string | null;
 
   try {
-    raw = getStorage().getItem(STORAGE_KEY);
+    raw = getStorage().getItem(
+      activeStorageKey(),
+    );
   } catch {
     return {
       status: 'unavailable',
@@ -111,7 +147,7 @@ export function writeCRMStorage(
     validateFinancialData(validData);
 
     getStorage().setItem(
-      STORAGE_KEY,
+      activeStorageKey(),
       JSON.stringify(validData),
     );
 
@@ -129,11 +165,18 @@ export function writeCRMStorage(
 // PREFERENCIAS LOCALES POR ORGANIZACIÓN
 // ============================================
 
-function settingsKey(organizationId: string) {
-  return `${SETTINGS_STORAGE_PREFIX}${organizationId}`;
+function settingsKey(
+  organizationId: string,
+) {
+  return (
+    SETTINGS_STORAGE_PREFIX +
+    organizationId
+  );
 }
 
-function isSettings(value: unknown): value is Settings {
+function isSettings(
+  value: unknown,
+): value is Settings {
   if (
     value === null ||
     typeof value !== 'object' ||
@@ -142,22 +185,27 @@ function isSettings(value: unknown): value is Settings {
     return false;
   }
 
-  const settings = value as Record<string, unknown>;
+  const settings =
+    value as Record<string, unknown>;
 
   if (
     typeof settings.organization !== 'string' ||
     typeof settings.userName !== 'string' ||
-    (settings.currency !== 'ARS' &&
-      settings.currency !== 'USD')
+    (
+      settings.currency !== 'ARS' &&
+      settings.currency !== 'USD'
+    )
   ) {
     return false;
   }
 
   if (
     settings.exchangeRate !== undefined &&
-    (typeof settings.exchangeRate !== 'number' ||
+    (
+      typeof settings.exchangeRate !== 'number' ||
       !Number.isFinite(settings.exchangeRate) ||
-      settings.exchangeRate <= 0)
+      settings.exchangeRate <= 0
+    )
   ) {
     return false;
   }
@@ -206,7 +254,9 @@ export function writeCRMSettings(
 ): string | null {
   try {
     if (!isSettings(settings)) {
-      throw new Error('Preferencias inválidas.');
+      throw new Error(
+        'Preferencias inválidas.',
+      );
     }
 
     getStorage().setItem(

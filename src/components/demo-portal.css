@@ -1,0 +1,277 @@
+
+/* ==========================================
+   NEXO CRM — ACCESO PÚBLICO A LA DEMO
+   ========================================== */
+
+.nexo-demo-router {
+  min-height: 100dvh;
+}
+
+/* El acceso de demostración solo se muestra
+   cuando está presente la pantalla de AuthGate. */
+
+.nexo-demo-entry {
+  display: none;
+}
+
+.nexo-demo-router:has(.nexo-auth-page)
+  > .nexo-demo-entry {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+
+  width: min(620px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 13px 16px;
+
+  background: #162443f5;
+  border: 1px solid #435c90;
+  border-radius: 13px;
+  box-shadow: 0 14px 42px #02061280;
+
+  color: #eef3ff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.nexo-demo-entry-copy {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.nexo-demo-entry-copy > svg {
+  flex: 0 0 auto;
+  color: #a9b6ff;
+}
+
+.nexo-demo-entry-copy span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nexo-demo-entry-copy strong {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.nexo-demo-entry-copy small {
+  color: #acbcda;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.nexo-demo-entry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+
+  min-height: 39px;
+  padding: 0 15px;
+
+  color: #fff;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 800;
+
+  background: linear-gradient(
+    100deg,
+    #4b80f8,
+    #7967e9
+  );
+
+  border-radius: 9px;
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease;
+}
+
+.nexo-demo-entry-button:hover {
+  color: #fff;
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+/* ==========================================
+   BARRA DEL MODO DEMO
+   ========================================== */
+
+.nexo-public-demo {
+  min-height: 100dvh;
+}
+
+.nexo-demo-banner {
+  position: fixed;
+  z-index: 500;
+
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+
+  width: min(620px, calc(100vw - 24px));
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: 9px 12px 9px 15px;
+
+  background: #172747f5;
+  border: 1px solid #6376b4;
+  border-radius: 13px;
+  box-shadow: 0 15px 45px #020616bb;
+
+  color: #edf3ff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.nexo-demo-banner-info,
+.nexo-demo-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nexo-demo-banner-icon {
+  display: grid;
+  place-items: center;
+
+  width: 36px;
+  height: 36px;
+
+  color: #c7bbff;
+  background: #383365;
+  border: 1px solid #6556ab;
+  border-radius: 10px;
+}
+
+.nexo-demo-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nexo-demo-banner-text strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.nexo-demo-banner-text small {
+  color: #b4c5e4;
+  font-size: 10px;
+}
+
+.nexo-demo-banner button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  min-height: 36px;
+  padding: 0 12px;
+
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.nexo-demo-reset {
+  color: #d4e1fc;
+  background: #263b61;
+  border: 1px solid #516893;
+}
+
+.nexo-demo-reset:hover {
+  background: #334d79;
+}
+
+.nexo-demo-exit {
+  color: #fff;
+  background: #596cf0;
+  border: 1px solid #8490ff;
+}
+
+.nexo-demo-exit:hover {
+  background: #7180fc;
+}
+
+.nexo-demo-loading {
+  display: grid;
+  place-items: center;
+
+  min-height: 100dvh;
+  background: #0d1428;
+  color: #edf3ff;
+
+  font: 13px Inter, system-ui, sans-serif;
+}
+
+/* ==========================================
+   ACCESIBILIDAD Y MÓVILES
+   ========================================== */
+
+.nexo-demo-entry-button:focus-visible,
+.nexo-demo-banner button:focus-visible {
+  outline: 2px solid #c7d9ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .nexo-demo-entry {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .nexo-demo-entry-button {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .nexo-demo-banner {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .nexo-demo-banner-info {
+    flex: 1;
+  }
+
+  .nexo-demo-banner-actions {
+    justify-content: space-between;
+  }
+}
+
+@media (max-height: 650px) {
+  .nexo-demo-router:has(.nexo-auth-page)
+    > .nexo-demo-entry {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    margin: -8px auto 20px;
+  }
+
+  .nexo-demo-router:has(.nexo-auth-page)
+    .nexo-auth-page {
+    min-height: auto;
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+}
