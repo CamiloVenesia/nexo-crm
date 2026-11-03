@@ -20,6 +20,9 @@ const DEMO_SESSION_MARKER =
 const DEMO_CALENDAR_KEY =
   'nexo-calendar-events:demo';
 
+const DEMO_MESSAGES_KEY =
+  'nexo-demo-messages-v1';
+
 function isDemoRoute(): boolean {
   return (
     new URLSearchParams(
@@ -30,6 +33,7 @@ function isDemoRoute(): boolean {
 
 function getDemoUrl(): string {
   const url = new URL(window.location.href);
+
   url.searchParams.set('demo', '1');
 
   return url.pathname + url.search + url.hash;
@@ -37,6 +41,7 @@ function getDemoUrl(): string {
 
 function getNormalUrl(): string {
   const url = new URL(window.location.href);
+
   url.searchParams.delete('demo');
 
   return url.pathname + url.search + url.hash;
@@ -44,33 +49,28 @@ function getNormalUrl(): string {
 
 function clearDemoData(): void {
   try {
-    window.sessionStorage.removeItem(
-      DEMO_STORAGE_KEY,
-    );
+    window.sessionStorage.removeItem(DEMO_STORAGE_KEY);
 
     window.sessionStorage.removeItem(
       DEMO_SESSION_MARKER,
+    );
+
+    window.sessionStorage.removeItem(
+      DEMO_MESSAGES_KEY,
     );
 
     window.localStorage.removeItem(
       DEMO_CALENDAR_KEY,
     );
   } catch {
-    // Si el navegador bloquea el almacenamiento,
-    // igualmente permitimos salir o reiniciar.
+    // El navegador puede bloquear el almacenamiento.
   }
 }
 
 export function DemoPortal() {
   const demo = isDemoRoute();
 
-  const [ready, setReady] = useState(
-    !demo,
-  );
-
-  // ==========================================
-  // PREPARAR UN ENTORNO AISLADO
-  // ==========================================
+  const [ready, setReady] = useState(!demo);
 
   useEffect(() => {
     if (!demo) return;
@@ -81,8 +81,9 @@ export function DemoPortal() {
       );
 
       if (active !== '1') {
-        // Una nueva sesión no debe recuperar
-        // eventos de una demo anterior.
+        window.sessionStorage.removeItem(
+          DEMO_MESSAGES_KEY,
+        );
 
         window.localStorage.removeItem(
           DEMO_CALENDAR_KEY,
@@ -94,8 +95,7 @@ export function DemoPortal() {
         );
       }
     } catch {
-      // La demo podrá usarse aun si el navegador
-      // no permite guardar datos temporalmente.
+      // La Demo sigue disponible sin persistencia.
     }
 
     setReady(true);
@@ -103,17 +103,15 @@ export function DemoPortal() {
 
   function resetDemo() {
     clearDemoData();
+
     window.location.reload();
   }
 
   function leaveDemo() {
     clearDemoData();
+
     window.location.assign(getNormalUrl());
   }
-
-  // ==========================================
-  // MODO DEMOSTRACIÓN
-  // ==========================================
 
   if (demo) {
     if (!ready) {
@@ -126,14 +124,6 @@ export function DemoPortal() {
 
     return (
       <div className="nexo-public-demo">
-        {/*
-          App se renderiza sin WorkspaceProvider.
-
-          De esta manera CRMProvider utiliza
-          los datos locales de demostración
-          y no carga una organización de Supabase.
-        */}
-
         <App />
 
         <div
@@ -148,9 +138,7 @@ export function DemoPortal() {
 
             <span className="nexo-demo-banner-text">
               <strong>Modo Demo</strong>
-              <small>
-                Datos ficticios · Sin cuenta
-              </small>
+              <small>Datos ficticios · Sin cuenta</small>
             </span>
           </div>
 
@@ -179,19 +167,9 @@ export function DemoPortal() {
     );
   }
 
-  // ==========================================
-  // ACCESO NORMAL: ADMINISTRADOR Y MIEMBRO
-  // ==========================================
-
   return (
     <div className="nexo-demo-router">
       <AuthGate />
-
-      {/*
-        El botón se muestra únicamente cuando
-        AuthGate presenta una pantalla de acceso.
-        Las sesiones autenticadas no lo muestran.
-      */}
 
       <div className="nexo-demo-entry">
         <div className="nexo-demo-entry-copy">

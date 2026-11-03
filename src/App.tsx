@@ -38,6 +38,7 @@ import { EditorModal } from './components/EditorModal';
 import type { Editing } from './components/EditorModal';
 
 import { CRMProvider, useCRM } from './lib/store';
+import { isPublicDemoMode } from './lib/persistence';
 import { searchCRM } from './lib/search';
 import { downloadJSON, overdue } from './lib/utils';
 
@@ -45,74 +46,73 @@ import type { Deal, Page, Task } from './types';
 
 import './styles.css';
 
-// ======================================================
-// CARGA DIFERIDA DE LAS PANTALLAS
-// Cada pantalla se descarga cuando se utiliza.
-// ======================================================
+// Cada pantalla se descarga solo cuando se necesita.
 
 const Dashboard = lazy(() =>
-  import('./views/Dashboard').then((module) => ({
-    default: module.Dashboard,
+  import('./views/Dashboard').then((m) => ({
+    default: m.Dashboard,
   })),
 );
 
 const Deals = lazy(() =>
-  import('./views/Deals').then((module) => ({
-    default: module.Deals,
+  import('./views/Deals').then((m) => ({
+    default: m.Deals,
   })),
 );
 
 const Contacts = lazy(() =>
-  import('./views/Contacts').then((module) => ({
-    default: module.Contacts,
+  import('./views/Contacts').then((m) => ({
+    default: m.Contacts,
   })),
 );
 
 const Companies = lazy(() =>
-  import('./views/Companies').then((module) => ({
-    default: module.Companies,
+  import('./views/Companies').then((m) => ({
+    default: m.Companies,
   })),
 );
 
 const Tasks = lazy(() =>
-  import('./views/Tasks').then((module) => ({
-    default: module.Tasks,
+  import('./views/Tasks').then((m) => ({
+    default: m.Tasks,
   })),
 );
 
 const Activity = lazy(() =>
-  import('./views/Activity').then((module) => ({
-    default: module.Activity,
+  import('./views/Activity').then((m) => ({
+    default: m.Activity,
   })),
 );
 
 const Insights = lazy(() =>
-  import('./views/Insights').then((module) => ({
-    default: module.Insights,
+  import('./views/Insights').then((m) => ({
+    default: m.Insights,
   })),
 );
 
 const Settings = lazy(() =>
-  import('./views/Settings').then((module) => ({
-    default: module.Settings,
-  })),
-);
-
-const Messages = lazy(() =>
-  import('./views/Messages').then((module) => ({
-    default: module.Messages,
+  import('./views/Settings').then((m) => ({
+    default: m.Settings,
   })),
 );
 
 const Calendar = lazy(() =>
-  import('./views/Calendar').then((module) => ({
-    default: module.Calendar,
+  import('./views/Calendar').then((m) => ({
+    default: m.Calendar,
   })),
 );
 
-// ======================================================
-// NAVEGACIÓN
-// ======================================================
+// La Demo no monta la mensajería real ni ejecuta sus RPC.
+
+const Messages = lazy(() =>
+  isPublicDemoMode()
+    ? import('./views/DemoMessages').then((m) => ({
+        default: m.DemoMessages,
+      }))
+    : import('./views/Messages').then((m) => ({
+        default: m.Messages,
+      })),
+);
 
 type WorkspacePage = Page | 'messages' | 'calendar';
 
@@ -137,10 +137,6 @@ const validPages: WorkspacePage[] = [
   'settings',
 ];
 
-// ======================================================
-// ESTADO DE CARGA
-// ======================================================
-
 function LoadingPage() {
   return (
     <div
@@ -160,15 +156,12 @@ function LoadingPage() {
   );
 }
 
-// ======================================================
-// WORKSPACE
-// ======================================================
-
 function WorkSpace() {
   const { data, notification } = useCRM();
 
   const [page, setPage] = useState<WorkspacePage>(() => {
     const hash = window.location.hash.replace('#/', '') as WorkspacePage;
+
     return validPages.includes(hash) ? hash : 'dashboard';
   });
 
@@ -184,16 +177,15 @@ function WorkSpace() {
   const navigate = (destination: WorkspacePage) => {
     setPage(destination);
     window.location.hash = `/${destination}`;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
 
     setSearchOpen(false);
     setProfileOpen(false);
     setMenuOpen(false);
   };
-
-  // ====================================================
-  // SINCRONIZAR NAVEGACIÓN CON URL
-  // ====================================================
 
   useEffect(() => {
     const onHashChange = () => {
@@ -210,10 +202,6 @@ function WorkSpace() {
       window.removeEventListener('hashchange', onHashChange);
     };
   }, []);
-
-  // ====================================================
-  // ATAJOS DE TECLADO
-  // ====================================================
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -240,10 +228,6 @@ function WorkSpace() {
       window.removeEventListener('keydown', onKey);
     };
   }, []);
-
-  // ====================================================
-  // TAREAS Y BÚSQUEDA
-  // ====================================================
 
   const urgent = data.tasks
     .filter((task) => !task.done && overdue(task.dueDate))
@@ -312,10 +296,6 @@ function WorkSpace() {
     setSearch('');
     setSearchOpen(false);
   };
-
-  // ====================================================
-  // NAVEGACIÓN DESDE NOTIFICACIONES
-  // ====================================================
 
   const openNotification = (item: CRMNotification) => {
     const entityId = item.entity_id ?? '';
@@ -402,10 +382,6 @@ function WorkSpace() {
     navigate('activity');
   };
 
-  // ====================================================
-  // ENLACES DE NAVEGACIÓN
-  // ====================================================
-
   const navLinks = nav.map(({ id, label, icon: Icon }) => (
     <button
       key={id}
@@ -425,10 +401,6 @@ function WorkSpace() {
       <div className="ambient-glow ambient-right" />
 
       <div className="app-frame">
-        {/* ==========================================
-            BARRA SUPERIOR
-        ========================================== */}
-
         <header className="topbar">
           <button
             className="brand-button"
@@ -447,8 +419,6 @@ function WorkSpace() {
           </nav>
 
           <div className="topbar-tools">
-            {/* BÚSQUEDA GLOBAL */}
-
             <div className="global-search">
               <button
                 type="button"
@@ -516,13 +486,13 @@ function WorkSpace() {
                       </button>
                     ))
                   ) : (
-                    <p>Sin coincidencias para “{search}”</p>
+                    <p>
+                      Sin coincidencias para “{search}”
+                    </p>
                   )}
                 </div>
               )}
             </div>
-
-            {/* NOTIFICACIONES EXISTENTES */}
 
             <NotificationCenter
               fallbackTasks={urgent}
@@ -530,17 +500,15 @@ function WorkSpace() {
               onOpenPanel={() => setProfileOpen(false)}
             />
 
-            {/* PERFIL */}
-
             <div className="popover-anchor">
               <button
                 type="button"
                 className="profile-button"
                 aria-label="Menú de usuario"
                 aria-expanded={profileOpen}
-                onClick={() => {
-                  setProfileOpen((open) => !open);
-                }}
+                onClick={() =>
+                  setProfileOpen((open) => !open)
+                }
               >
                 <Avatar
                   name={data.settings.userName}
@@ -552,10 +520,12 @@ function WorkSpace() {
 
               {profileOpen && (
                 <div className="floating-menu profile-menu">
-                  <strong>{data.settings.userName}</strong>
+                  <strong>
+                    {data.settings.userName}
+                  </strong>
 
                   <small>
-                    {data.settings.organization} · Demo local
+                    {data.settings.organization}
                   </small>
 
                   <div className="menu-divider" />
@@ -587,16 +557,14 @@ function WorkSpace() {
               className="mobile-menu-btn tool-icon"
               aria-label="Abrir menú"
               aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() =>
+                setMenuOpen((open) => !open)
+              }
             >
               <Menu size={21} />
             </button>
           </div>
         </header>
-
-        {/* ==========================================
-            NAVEGACIÓN MÓVIL
-        ========================================== */}
 
         {menuOpen && (
           <nav
@@ -617,10 +585,6 @@ function WorkSpace() {
         )}
 
         <div className="workspace-body">
-          {/* ==========================================
-              BARRA LATERAL
-          ========================================== */}
-
           <aside
             className="icon-rail"
             aria-label="Accesos rápidos"
@@ -699,11 +663,6 @@ function WorkSpace() {
               </button>
             </div>
           </aside>
-
-          {/* ==========================================
-              CONTENIDO PRINCIPAL
-              NUEVA CARGA DIFERIDA
-          ========================================== */}
 
           <main className="main-area" id="main-content">
             <Suspense fallback={<LoadingPage />}>
@@ -788,17 +747,13 @@ function WorkSpace() {
           </main>
         </div>
 
-        {/* ==========================================
-            PIE DE PÁGINA
-        ========================================== */}
-
         <footer className="app-footer">
           <span>
             <span className="live-dot" />
             Workspace · {data.settings.organization}
           </span>
 
-          <span>NEXO CRM 0.1 · Demo local</span>
+          <span>NEXO CRM 0.1</span>
 
           <span>
             <Command size={12} />
@@ -806,10 +761,6 @@ function WorkSpace() {
           </span>
         </footer>
       </div>
-
-      {/* ==========================================
-          CIERRE DE BÚSQUEDA
-      ========================================== */}
 
       {searchOpen && (
         <button
@@ -820,10 +771,6 @@ function WorkSpace() {
         />
       )}
 
-      {/* ==========================================
-          EDITOR DE REGISTROS
-      ========================================== */}
-
       {editing && (
         <EditorModal
           key={`${editing.kind}-${editing.value?.id ?? 'new'}`}
@@ -832,20 +779,12 @@ function WorkSpace() {
         />
       )}
 
-      {/* ==========================================
-          CONFIRMACIÓN DE OPERACIONES
-      ========================================== */}
-
       {notification && (
         <div className="toast" role="status">
           <CheckCircle2 size={18} />
           {notification}
         </div>
       )}
-
-      {/* ==========================================
-          AYUDA
-      ========================================== */}
 
       {helpOpen && (
         <div
@@ -871,8 +810,8 @@ function WorkSpace() {
               <button
                 className="icon-btn"
                 type="button"
-                onClick={() => setHelpOpen(false)}
                 aria-label="Cerrar"
+                onClick={() => setHelpOpen(false)}
               >
                 <X size={19} />
               </button>
@@ -880,16 +819,14 @@ function WorkSpace() {
 
             <h2>
               Todo lo importante,
-              <br />
-              <span>en un solo lugar.</span>
+              <span> en un solo lugar.</span>
             </h2>
 
             <p>
-              Registrá un cliente, sumá sus contactos,
-              creá oportunidades y tareas. El Calendario
-              organiza los vencimientos; Mensajería reúne
-              los accesos a canales externos hasta su
-              integración real.
+              Registrá clientes, sumá contactos, creá oportunidades y
+              tareas. El calendario organiza los vencimientos; la
+              mensajería interna conecta a los integrantes del equipo.
+              La demo utiliza únicamente datos de ejemplo.
             </p>
 
             <ol>
@@ -906,13 +843,15 @@ function WorkSpace() {
                 <strong>Tareas y Calendario</strong> — Próximas acciones.
               </li>
               <li>
-                <strong>Historial y Reportes</strong> — Seguimiento de resultados.
+                <strong>Mensajería</strong> — Conversaciones del equipo.
+              </li>
+              <li>
+                <strong>Historial y Reportes</strong> — Seguimiento.
               </li>
             </ol>
 
             <p className="hint-row">
-              Esta versión es una demo local. Exportá
-              respaldos desde Configuración.
+              Los visitantes de la demo no pueden acceder a datos reales.
             </p>
 
             <button
@@ -932,10 +871,6 @@ function WorkSpace() {
     </div>
   );
 }
-
-// ======================================================
-// APLICACIÓN PRINCIPAL
-// ======================================================
 
 export default function App() {
   return (
