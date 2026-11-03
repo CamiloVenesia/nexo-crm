@@ -23,6 +23,27 @@ La demostración permite conocer el funcionamiento del CRM sin acceder a los dat
 
 ---
 
+
+## Vista previa de la aplicación
+
+### Dashboard comercial
+![Dashboard de NEXO CRM](docs/screenshots/dashboard.png)
+
+### Pipeline de oportunidades
+![Pipeline de NEXO CRM](docs/screenshots/pipeline.png)
+
+### Calendario comercial
+![Calendario de NEXO CRM](docs/screenshots/calendario.png)
+
+### Mensajería interna
+![Mensajería de NEXO CRM](docs/screenshots/mensajeria.png)
+
+### Reportes y análisis
+![Reportes de NEXO CRM](docs/screenshots/reportes.png)
+
+---
+
+
 ## Funcionalidades principales
 
 ### 1. Dashboard comercial
